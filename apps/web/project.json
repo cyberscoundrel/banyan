@@ -1,0 +1,33 @@
+{
+  "name": "web",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/web/src",
+  "tags": ["type:app", "lang:typescript"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "inputs": ["typescript", "{projectRoot}/public/**/*", "{projectRoot}/webpack.config.js"],
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/web",
+        "command": "webpack --mode production"
+      }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "command": "webpack serve --mode development"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "command": "webpack serve --mode development --open"
+      }
+    }
+  }
+}
+

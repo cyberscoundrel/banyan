@@ -1,0 +1,43 @@
+# Project-specific directories to ignore
+
+**/scrap/
+
+
+webpage/
+**/node_modules/
+/dist/
+
+
+
+
+# Go binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go test files
+*.test
+*.out
+
+# Debug binaries
+__debug_bin*
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+
+# Temporary files
+tmp/
+temp/

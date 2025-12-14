@@ -1,0 +1,25 @@
+{
+  "privkey": "./keys/node-identity.pem",
+  "servicesDir": "./services",
+  "figsDir": "./figs",
+  "listen": "/ip4/0.0.0.0/tcp/9000",
+  "disableDht": false,
+  "noAnnounce": false,
+  "anonLookups": false,
+  "noCrypto": false,
+  "natTraversal": true,
+  "routerConfig": "./router-config.json",
+  "addonsDir": "./addons",
+  "beaconIncludePeerIdAnnouncements": true,
+  "beaconPeerIdDirectOnly": false,
+  "allowExpiredFigs": false,
+  "allowInsecureFigs": false,
+  "_comment_bootstraps": "Bootstraps can be either an inline array or a path to a JSON file containing an array",
+  "bootstraps": [
+    "/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
+    "/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa",
+    "/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ"
+  ],
+  "_comment_bootstraps_alternative": "Or use a file path: \"bootstraps\": \"./bootstraps.json\""
+}
+

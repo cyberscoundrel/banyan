@@ -1,0 +1,126 @@
+{
+    "authorityKeys": [
+        "authorityKey1"
+    ],
+    "nodes": [
+        {
+            "name": "node1",
+            "pk": "true",
+            "services": [
+                {
+                    "key": "serviceKey1",
+                    "figs": [
+                        "fig1",
+                        "fig2"
+                    ]
+                },
+                {
+                    "key": "serviceKey5",
+                    "figs": [
+                        "fig2"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "node2",
+            "pk": "true",
+            "services": [
+                {
+                    "key": "serviceKey2",
+                    "figs": [
+                        "fig1"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "node3",
+            "pk": "false",
+            "services": [
+                {
+                    "key": "serviceKey3",
+                    "figs": [
+                        "fig2"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "node4",
+            "pk": "false",
+            "services": [
+                {
+                    "key": "serviceKey4",
+                    "figs": [
+                        "fig2"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "node5",
+            "pk": "false",
+            "services": [
+                {
+                    "key": "serviceKey2",
+                    "figs": [
+                        "fig1"
+                    ]
+                }
+            ]
+        }
+    ],
+    "figs": [
+        {
+            "name": "fig1",
+            "root": {
+                "path": "/",
+                "keys": [
+                    "serviceKey1",
+                    "serviceKey2"
+                ],
+                "children": [
+                    {
+                        "path": "/api",
+                        "keys": [
+                            "serviceKey3"
+                        ]
+                    }
+                ]
+            },
+            "requiredSigners": [
+                "authorityKey1",
+                "serviceKey2"
+            ]
+            
+        },
+        {
+            "name": "fig2",
+            "root": {
+                "path": "/",
+                "keys": [
+                    "serviceKey3",
+                    "serviceKey4"
+                ],
+                "children": [
+                    {
+                        "path": "/api",
+                        "keys": [
+                            "serviceKey5"
+                        ],
+                        "children": [
+                            {
+                                "path": "/v1",
+                                "keys": [
+                                    "serviceKey1"
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+    
+}

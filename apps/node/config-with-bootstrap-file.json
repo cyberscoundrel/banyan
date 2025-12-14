@@ -1,0 +1,7 @@
+{
+  "listen": "/ip4/0.0.0.0/tcp/9000",
+  "servicesDir": "./services",
+  "natTraversal": true,
+  "bootstraps": "./bootstraps.json"
+}
+

@@ -1,0 +1,2 @@
+[2m> [22mgo build -o ../../dist/apps/topology-gen/generator.exe generator.go
+

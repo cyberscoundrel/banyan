@@ -1,0 +1,44 @@
+{
+  "name": "addon-sdk",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "packages/addon-sdk",
+  "tags": ["type:lib", "lang:go"],
+  "namedInputs": {
+    "go": ["{projectRoot}/**/*.go", "{projectRoot}/go.mod"]
+  },
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "inputs": ["go"],
+      "options": {
+        "cwd": "packages/addon-sdk",
+        "command": "go build ./..."
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "inputs": ["go"],
+      "options": {
+        "cwd": "packages/addon-sdk",
+        "command": "go test ./..."
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "inputs": ["go"],
+      "options": {
+        "cwd": "packages/addon-sdk",
+        "command": "go vet ./..."
+      }
+    },
+    "tidy": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "packages/addon-sdk",
+        "command": "go mod tidy"
+      }
+    }
+  }
+}
+

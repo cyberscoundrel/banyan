@@ -1,0 +1,31 @@
+{
+  "name": "@banyan/monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "nx run-many -t build",
+    "build:node": "nx build node",
+    "build:web": "nx build web",
+    "build:topology-gen": "nx build topology-gen",
+    "test": "nx run-many -t test",
+    "lint": "nx run-many -t lint",
+    "dev": "nx run-many -t dev",
+    "graph": "nx graph",
+    "affected": "nx affected",
+    "affected:build": "nx affected -t build",
+    "affected:test": "nx affected -t test"
+  },
+  "devDependencies": {
+    "nx": "^20.2.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "npm@10.0.0"
+}
+

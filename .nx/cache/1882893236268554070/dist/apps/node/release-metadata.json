@@ -1,0 +1,41 @@
+{
+    "commit":  "c8f8fd0243811e7cb68bb064025d1f6622152829",
+    "version":  "c8f8fd0-dirty",
+    "buildDate":  "2025-12-08T03:21:56Z",
+    "whatsNew":  "😊",
+    "buildTime":  "2025-12-08T03:21:56Z",
+    "downloads":  {
+                      "linux":  {
+                                    "checksum":  "sha256:5858bfe150ff27770b59033c1440b3b5c3939283c77f2676b20984bbd5c9330e",
+                                    "sizeBytes":  26136728,
+                                    "arch":  "x64",
+                                    "filename":  "banyan",
+                                    "platform":  "Linux",
+                                    "size":  "24.9 MB"
+                                },
+                      "macos_intel":  {
+                                          "checksum":  "sha256:38f50715ddb55b59cdb65ec2a96e56415aa9c9940efdcc73dc295c6c93024198",
+                                          "sizeBytes":  26698560,
+                                          "arch":  "x64 (Intel)",
+                                          "filename":  "banyan-amd64",
+                                          "platform":  "macOS",
+                                          "size":  "25.5 MB"
+                                      },
+                      "macos_arm":  {
+                                        "checksum":  "sha256:28d0a39c2526df8494740fd12190dcde9bd0c6596377614af2473f6313ae7ee9",
+                                        "sizeBytes":  25730274,
+                                        "arch":  "ARM64 (Apple Silicon)",
+                                        "filename":  "banyan-arm64",
+                                        "platform":  "macOS",
+                                        "size":  "24.5 MB"
+                                    },
+                      "windows":  {
+                                      "checksum":  "sha256:1c88181d7b52b84015cf247cfa10d9bfbae02aa5ac6cf9cf567285982fe5d9d0",
+                                      "sizeBytes":  26531840,
+                                      "arch":  "x64",
+                                      "filename":  "banyan.exe",
+                                      "platform":  "Windows",
+                                      "size":  "25.3 MB"
+                                  }
+                  }
+}
