@@ -213,6 +213,188 @@
       "nx/target-defaults"
     ]
   },
+  "apps/node/addon/proxy": {
+    "root": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "name": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "$schema": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "projectType": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "sourceRoot": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "tags": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "tags.type:addon": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "tags.lang:go": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.executor": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options.command": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options.cwd": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations.debug-win": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations.debug-win.command": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations.debug-linux": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations.debug-linux.command": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations.debug-osx": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations.debug-osx.command": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations.release-win": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations.release-win.command": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations.release-linux": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations.release-linux.command": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations.release-osx-amd64": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations.release-osx-amd64.command": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations.release-osx-arm64": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.configurations.release-osx-arm64.command": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:debug": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:debug.executor": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:debug.options": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:debug.options.commands": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:debug.options.cwd": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:debug.options.parallel": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:release": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:release.executor": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:release.options": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:release.options.commands": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:release.options.cwd": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:release.options.parallel": [
+      "apps/node/addon/proxy/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.dependsOn": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.inputs": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.cache": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
+    ]
+  },
   "apps/node": {
     "root": [
       "apps/node/project.json",
@@ -796,6 +978,354 @@
     ],
     "targets.tidy.options.command": [
       "packages/addon-sdk/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.dependsOn": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.cache": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.test.dependsOn": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.test.cache": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.test.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.lint.cache": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.lint.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
+    ]
+  },
+  "packages/transports/i2p": {
+    "root": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "name": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "$schema": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "projectType": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "sourceRoot": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "tags": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "tags.type:lib": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "tags.lang:go": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "tags.transport": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "namedInputs": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "namedInputs.go": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.executor": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.inputs": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options.cwd": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options.command": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.executor": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.inputs": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.options": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.options.cwd": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.options.command": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.executor": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.inputs": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.options": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.options.cwd": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.options.command": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy.executor": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy.options": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy.options.cwd": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy.options.command": [
+      "packages/transports/i2p/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.dependsOn": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.cache": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.test.dependsOn": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.test.cache": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.test.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.lint.cache": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.lint.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
+    ]
+  },
+  "packages/transports/nym": {
+    "root": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "name": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "$schema": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "projectType": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "sourceRoot": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "tags": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "tags.type:lib": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "tags.lang:go": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "tags.transport": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "namedInputs": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "namedInputs.go": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.executor": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.inputs": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options.cwd": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options.command": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.executor": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.inputs": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.options": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.options.cwd": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.options.command": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.executor": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.inputs": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.options": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.options.cwd": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.options.command": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy.executor": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy.options": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy.options.cwd": [
+      "packages/transports/nym/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy.options.command": [
+      "packages/transports/nym/project.json",
       "nx/core/project-json"
     ],
     "targets.build.dependsOn": [

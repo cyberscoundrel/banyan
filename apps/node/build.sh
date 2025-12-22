@@ -56,6 +56,15 @@ LDFLAGS="-s -w -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}"
 if [ "$METADATA_ONLY" != true ]; then
     # Create bin directories if they don't exist
     mkdir -p bin/win bin/linux bin/osx
+
+    # Create debug directories for each platform
+    echo "📁 Creating debug folder structure..."
+    for platform in win linux osx; do
+        for subdir in addons figs services; do
+            mkdir -p "bin/debug/$platform/$subdir"
+        done
+    done
+    echo "   Created debug/{win,linux,osx}/{addons,figs,services}"
 else
     # For metadata only, just ensure bin directory exists
     mkdir -p bin
@@ -80,6 +89,32 @@ if [ "$METADATA_ONLY" != true ]; then
     echo "🍎 Building for macOS (arm64 - Apple Silicon)..."
     GOOS=darwin GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o bin/osx/banyan-arm64 .
     echo "✅ macOS ARM64 build complete: bin/osx/banyan-arm64"
+
+    # Copy debug startup scripts to each platform directory
+    echo ""
+    echo "📜 Copying debug startup scripts..."
+    SCRIPTS_DIR="$(dirname "$0")/scripts"
+
+    # Windows - copy .bat and .ps1 scripts
+    if [ -f "$SCRIPTS_DIR/start-debug.ps1" ]; then
+        cp "$SCRIPTS_DIR/start-debug.ps1" bin/win/start-debug.ps1
+        cp "$SCRIPTS_DIR/start-debug.bat" bin/win/start-debug.bat
+        echo "   Copied Windows debug scripts"
+    fi
+
+    # Linux - copy .sh script
+    if [ -f "$SCRIPTS_DIR/start-debug.sh" ]; then
+        cp "$SCRIPTS_DIR/start-debug.sh" bin/linux/start-debug.sh
+        chmod +x bin/linux/start-debug.sh
+        echo "   Copied Linux debug script"
+    fi
+
+    # macOS - copy .sh script
+    if [ -f "$SCRIPTS_DIR/start-debug.sh" ]; then
+        cp "$SCRIPTS_DIR/start-debug.sh" bin/osx/start-debug.sh
+        chmod +x bin/osx/start-debug.sh
+        echo "   Copied macOS debug script"
+    fi
 fi
 
 # Calculate hashes and sizes for built binaries

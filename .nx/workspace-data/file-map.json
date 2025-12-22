@@ -10,207 +10,215 @@
   "fileMap": {
     "nonProjectFiles": [
       {
-        "file": "dist/topology/demo/nodes/node1/services/serviceKey1/fig1.json",
-        "hash": "3015880824305580286"
+        "file": ".gitignore",
+        "hash": "800054987742928026"
       },
       {
-        "file": "dist/topology/demo/nodes/node1/services/services.json",
-        "hash": "7890637999785773083"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node3/start-node.sh",
-        "hash": "10714706675111135127"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node4/start-node.bat",
-        "hash": "13653916205910669515"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node4/services/services.json",
-        "hash": "6705064777204243467"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node1/start-node.sh",
-        "hash": "5677719708302224542"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node3/services/serviceKey3/serviceKey3.pem",
-        "hash": "14476347766083637107"
-      },
-      {
-        "file": "dist/topology/demo/keys/serviceKey4.pem",
-        "hash": "5467270475523115602"
-      },
-      {
-        "file": "dist/apps/node/osx/banyan-amd64",
-        "hash": "5119083434796634709"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node5/services/serviceKey2/serviceKey2.pem",
-        "hash": "200572585624446944"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node2/services/serviceKey2/serviceKey2.pem",
-        "hash": "200572585624446944"
-      },
-      {
-        "file": "dist/topology/demo/keys/serviceKey1.pem",
-        "hash": "9138826227147636940"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node4/start-node.ps1",
-        "hash": "13342085917480821626"
-      },
-      {
-        "file": "dist/topology/demo/keys/key-mapping.json",
-        "hash": "16405405591422365883"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node1/services/serviceKey1/serviceKey1.pem",
-        "hash": "9138826227147636940"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node2/start-node.ps1",
-        "hash": "14660113713399718887"
-      },
-      {
-        "file": "dist/topology/demo/keys/serviceKey3.pem",
-        "hash": "14476347766083637107"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node1/start-node.bat",
-        "hash": "4315607950088386027"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node5/services/services.json",
-        "hash": "4353483718880572886"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node1/services/serviceKey1/fig2.json",
-        "hash": "15626427108435256642"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node2/start-node.sh",
-        "hash": "181300466549217239"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node4/services/serviceKey4/fig2.json",
-        "hash": "1992901137501268402"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node4/start-node.sh",
-        "hash": "11887952643412979857"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node2/services/services.json",
-        "hash": "4353483718880572886"
-      },
-      {
-        "file": "go.work",
-        "hash": "16779783156169120445"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node3/start-node.bat",
-        "hash": "12452891495142405646"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node2/services/serviceKey2/fig1.json",
-        "hash": "3643218824939034414"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node1/start-node.ps1",
-        "hash": "13517292775731762083"
-      },
-      {
-        "file": "dist/apps/node/osx/banyan-arm64",
-        "hash": "7025584518870639834"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node5/start-node.bat",
-        "hash": "10838555675321731742"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node2/node-identity.pem",
-        "hash": "3788758240067367136"
+        "file": "nx.json",
+        "hash": "11843248497900670785"
       },
       {
         "file": "go.work.sum",
-        "hash": "8410607264223212995"
+        "hash": "10037963554268640838"
       },
       {
-        "file": "dist/topology/demo/nodes/node2/start-node.bat",
-        "hash": "8648905892021337649"
+        "file": "go.work",
+        "hash": "4508183606565560551"
       },
       {
-        "file": "dist/topology/demo/nodes/node3/services/services.json",
-        "hash": "17379990471320051751"
+        "file": "package-lock.json",
+        "hash": "13625224223837716606"
       },
       {
-        "file": "dist/topology/demo/keys/serviceKey5.pem",
-        "hash": "121281855794942735"
+        "file": "tsconfig.base.json",
+        "hash": "1999084922207282074"
       },
       {
-        "file": ".gitignore",
-        "hash": "798400303970491968"
-      },
-      {
-        "file": "dist/topology/demo/keys/serviceKey2.pem",
-        "hash": "200572585624446944"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node3/services/serviceKey3/fig2.json",
-        "hash": "9581409957237401956"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node5/start-node.sh",
-        "hash": "5398133996408010787"
-      },
-      {
-        "file": "dist/topology/demo/keys/authority/authorityKey1.pem",
-        "hash": "4950018463527711967"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node4/services/serviceKey4/serviceKey4.pem",
-        "hash": "5467270475523115602"
-      },
-      {
-        "file": "dist/apps/topology-gen/generator",
-        "hash": "3760833624513455845"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node5/services/serviceKey2/fig1.json",
-        "hash": "17757241099039456870"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node1/services/serviceKey5/fig2.json",
-        "hash": "729602091425408988"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node5/start-node.ps1",
-        "hash": "12643543295699989055"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node3/start-node.ps1",
-        "hash": "9066159606087503896"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node1/services/serviceKey5/serviceKey5.pem",
-        "hash": "121281855794942735"
-      },
-      {
-        "file": "dist/topology/demo/nodes/node1/node-identity.pem",
-        "hash": "735821740870175444"
-      },
-      {
-        "file": "dist/apps/node/release-metadata.json",
-        "hash": "11117969675293511098"
-      },
-      {
-        "file": "dist/apps/node/linux/banyan",
-        "hash": "9861005431732072950"
+        "file": "package.json",
+        "hash": "9214069145436590123"
       }
     ],
     "projectFileMap": {
+      "transport-nym": [
+        {
+          "file": "packages/transports/nym/go.mod",
+          "hash": "9083817351356440316"
+        },
+        {
+          "file": "packages/transports/nym/go.sum",
+          "hash": "17164429091622517145"
+        },
+        {
+          "file": "packages/transports/nym/integration_test.go",
+          "hash": "3589327354061817984"
+        },
+        {
+          "file": "packages/transports/nym/internal/testutil/pipe.go",
+          "hash": "15947078526275178095"
+        },
+        {
+          "file": "packages/transports/nym/message/encoding.go",
+          "hash": "10837806732929084450"
+        },
+        {
+          "file": "packages/transports/nym/message/encoding_test.go",
+          "hash": "16775542251454776650"
+        },
+        {
+          "file": "packages/transports/nym/message/recipient.go",
+          "hash": "1053384947896053696"
+        },
+        {
+          "file": "packages/transports/nym/message/recipient_test.go",
+          "hash": "12818660317034067307"
+        },
+        {
+          "file": "packages/transports/nym/message/types.go",
+          "hash": "1099341719301038282"
+        },
+        {
+          "file": "packages/transports/nym/mixnet/client.go",
+          "hash": "1664103357552268440"
+        },
+        {
+          "file": "packages/transports/nym/mixnet/proto.go",
+          "hash": "6941079856940408593"
+        },
+        {
+          "file": "packages/transports/nym/project.json",
+          "hash": "353267693013289454"
+        },
+        {
+          "file": "packages/transports/nym/queue/queue.go",
+          "hash": "7378868792282239729"
+        },
+        {
+          "file": "packages/transports/nym/queue/queue_test.go",
+          "hash": "11520904078028245290"
+        },
+        {
+          "file": "packages/transports/nym/transport/addr.go",
+          "hash": "16936206840847101097"
+        },
+        {
+          "file": "packages/transports/nym/transport/conn.go",
+          "hash": "12456843429790841367"
+        },
+        {
+          "file": "packages/transports/nym/transport/listener.go",
+          "hash": "2179032677855509277"
+        },
+        {
+          "file": "packages/transports/nym/transport/substream.go",
+          "hash": "2491207752396414358"
+        },
+        {
+          "file": "packages/transports/nym/transport/transport.go",
+          "hash": "2100288912402531861"
+        },
+        {
+          "file": "packages/transports/nym/transport/transport_test.go",
+          "hash": "6756681452369521159"
+        }
+      ],
+      "transport-i2p": [
+        {
+          "file": "packages/transports/i2p/.github/workflows/integration-tests.yml",
+          "hash": "16612334965534663859"
+        },
+        {
+          "file": "packages/transports/i2p/connection.go",
+          "hash": "14373438211260399905"
+        },
+        {
+          "file": "packages/transports/i2p/docker-compose.yml",
+          "hash": "10177475066455123327"
+        },
+        {
+          "file": "packages/transports/i2p/docker/i2p/Dockerfile",
+          "hash": "4679153983983045951"
+        },
+        {
+          "file": "packages/transports/i2p/docker/i2p/clients.config",
+          "hash": "7284605099938603398"
+        },
+        {
+          "file": "packages/transports/i2p/docker/i2p/i2ptunnel.config",
+          "hash": "5268751047201524549"
+        },
+        {
+          "file": "packages/transports/i2p/docker/i2pd/Dockerfile",
+          "hash": "4782449750602773342"
+        },
+        {
+          "file": "packages/transports/i2p/docker/java-i2p/00-sam.config",
+          "hash": "11829243697885699597"
+        },
+        {
+          "file": "packages/transports/i2p/docker/java-i2p/Dockerfile",
+          "hash": "694849338189723789"
+        },
+        {
+          "file": "packages/transports/i2p/docker/java-i2p/clients.config",
+          "hash": "9617305535826427260"
+        },
+        {
+          "file": "packages/transports/i2p/go.mod",
+          "hash": "10334495262473257621"
+        },
+        {
+          "file": "packages/transports/i2p/go.sum",
+          "hash": "13176039902569876734"
+        },
+        {
+          "file": "packages/transports/i2p/integration_test.go",
+          "hash": "18287239358757885800"
+        },
+        {
+          "file": "packages/transports/i2p/listener.go",
+          "hash": "7601215271172170562"
+        },
+        {
+          "file": "packages/transports/i2p/project.json",
+          "hash": "7139174391639743573"
+        },
+        {
+          "file": "packages/transports/i2p/scripts/README.md",
+          "hash": "14481441134821350769"
+        },
+        {
+          "file": "packages/transports/i2p/scripts/check_i2p_ready.ps1",
+          "hash": "11227203367691496340"
+        },
+        {
+          "file": "packages/transports/i2p/scripts/check_i2p_ready.sh",
+          "hash": "2419945280248813761"
+        },
+        {
+          "file": "packages/transports/i2p/scripts/start_i2p_instances.ps1",
+          "hash": "17720258658024384210"
+        },
+        {
+          "file": "packages/transports/i2p/scripts/start_i2p_instances.sh",
+          "hash": "926198125666690634"
+        },
+        {
+          "file": "packages/transports/i2p/transport.go",
+          "hash": "8324298994088995846"
+        },
+        {
+          "file": "packages/transports/i2p/transport_test.go",
+          "hash": "4304258545927518265"
+        },
+        {
+          "file": "packages/transports/i2p/utils.go",
+          "hash": "5744412932034649456"
+        },
+        {
+          "file": "packages/transports/i2p/utils_test.go",
+          "hash": "11076224882423797375"
+        }
+      ],
       "addon-sdk": [
         {
           "file": "packages/addon-sdk/go.mod",
@@ -229,211 +237,255 @@
           "hash": "18225981939654112288"
         }
       ],
+      "node": [
+        {
+          "file": "apps/node/BUILD.md",
+          "hash": "12497906911054543417"
+        },
+        {
+          "file": "apps/node/CONFIG.md",
+          "hash": "16915639725162812114"
+        },
+        {
+          "file": "apps/node/Makefile",
+          "hash": "6026141582236318977"
+        },
+        {
+          "file": "apps/node/README.md",
+          "hash": "12264930690763599024"
+        },
+        {
+          "file": "apps/node/addon/build_test_addon.ps1",
+          "hash": "11716211734030999174"
+        },
+        {
+          "file": "apps/node/addon/build_test_addon.sh",
+          "hash": "135341143183301665"
+        },
+        {
+          "file": "apps/node/addon/manager.go",
+          "hash": "17114162507253822014"
+        },
+        {
+          "file": "apps/node/addon/sdk/mux.go",
+          "hash": "498983795532555583"
+        },
+        {
+          "file": "apps/node/addon/sdk/sdk.go",
+          "hash": "18225981939654112288"
+        },
+        {
+          "file": "apps/node/addon/testaddon/main.go",
+          "hash": "18330073507830850335"
+        },
+        {
+          "file": "apps/node/bootstraps.json",
+          "hash": "16883285338249191103"
+        },
+        {
+          "file": "apps/node/build.ps1",
+          "hash": "18304895820066474023"
+        },
+        {
+          "file": "apps/node/build.sh",
+          "hash": "16607534416548356519"
+        },
+        {
+          "file": "apps/node/common/types.go",
+          "hash": "17577735101001359323"
+        },
+        {
+          "file": "apps/node/config-with-bootstrap-file.json",
+          "hash": "2214912740462581998"
+        },
+        {
+          "file": "apps/node/config-with-inline-bootstraps.json",
+          "hash": "17124939794248709769"
+        },
+        {
+          "file": "apps/node/connection/manager.go",
+          "hash": "7348438529143518444"
+        },
+        {
+          "file": "apps/node/crypto/manager.go",
+          "hash": "11553351962105448144"
+        },
+        {
+          "file": "apps/node/crypto/manager_test.go",
+          "hash": "6259494591698519903"
+        },
+        {
+          "file": "apps/node/discovery/manager.go",
+          "hash": "7342309580551806215"
+        },
+        {
+          "file": "apps/node/docs/BEACON_FIGS_ENDPOINT.md",
+          "hash": "11442021248707879005"
+        },
+        {
+          "file": "apps/node/docs/SERVICE_ROUTING.md",
+          "hash": "13062685754855251164"
+        },
+        {
+          "file": "apps/node/events/broadcaster.go",
+          "hash": "16133524400742904875"
+        },
+        {
+          "file": "apps/node/events/broadcaster_test.go",
+          "hash": "7282444932027930871"
+        },
+        {
+          "file": "apps/node/example-node-config.json",
+          "hash": "802119338957685326"
+        },
+        {
+          "file": "apps/node/go.mod",
+          "hash": "13349371562500802262"
+        },
+        {
+          "file": "apps/node/go.sum",
+          "hash": "3959087091101034399"
+        },
+        {
+          "file": "apps/node/interfaces/interfaces.go",
+          "hash": "1499633977457008342"
+        },
+        {
+          "file": "apps/node/libp2p-http/handler.go",
+          "hash": "8518521567490502907"
+        },
+        {
+          "file": "apps/node/main.go",
+          "hash": "2437683975027423387"
+        },
+        {
+          "file": "apps/node/management-server/handlers/basic.go",
+          "hash": "2069918063414116446"
+        },
+        {
+          "file": "apps/node/management-server/handlers/libp2p.go",
+          "hash": "3330226657210193264"
+        },
+        {
+          "file": "apps/node/management-server/handlers/peers.go",
+          "hash": "5117428265032634928"
+        },
+        {
+          "file": "apps/node/management-server/handlers/proxy.go",
+          "hash": "17632892210976460484"
+        },
+        {
+          "file": "apps/node/management-server/handlers/router.go",
+          "hash": "14976486265624051502"
+        },
+        {
+          "file": "apps/node/management-server/handlers/service.go",
+          "hash": "6239276063958115762"
+        },
+        {
+          "file": "apps/node/management-server/handlers/tunnel.go",
+          "hash": "2378254270974737440"
+        },
+        {
+          "file": "apps/node/management-server/handlers/tunnel_test.go",
+          "hash": "12548587085641465734"
+        },
+        {
+          "file": "apps/node/management-server/handlers/websocket.go",
+          "hash": "8056671418335414282"
+        },
+        {
+          "file": "apps/node/management-server/server.go",
+          "hash": "5849540509804558568"
+        },
+        {
+          "file": "apps/node/management-server/types.go",
+          "hash": "341061336045324708"
+        },
+        {
+          "file": "apps/node/minimal-test-config.json",
+          "hash": "6480187215815098862"
+        },
+        {
+          "file": "apps/node/node/node.go",
+          "hash": "3150429378381084199"
+        },
+        {
+          "file": "apps/node/project.json",
+          "hash": "1430012641284487202"
+        },
+        {
+          "file": "apps/node/scripts/diagnose-discovery.ps1",
+          "hash": "2313499952496617768"
+        },
+        {
+          "file": "apps/node/scripts/start-debug.bat",
+          "hash": "12283474743466841758"
+        },
+        {
+          "file": "apps/node/scripts/start-debug.ps1",
+          "hash": "13615470495690525813"
+        },
+        {
+          "file": "apps/node/scripts/start-debug.sh",
+          "hash": "5517874095243785284"
+        },
+        {
+          "file": "apps/node/service/manager.go",
+          "hash": "9480334881029264480"
+        },
+        {
+          "file": "apps/node/test-config.json",
+          "hash": "16385193219027061897"
+        },
+        {
+          "file": "apps/node/tools/Eula.txt",
+          "hash": "16430386000327185298"
+        },
+        {
+          "file": "apps/node/tools/Handle.zip",
+          "hash": "5905244163270287135"
+        },
+        {
+          "file": "apps/node/transport/filter.go",
+          "hash": "1553738618204047380"
+        },
+        {
+          "file": "apps/node/tunnel/tunnel.go",
+          "hash": "13939770221923599464"
+        },
+        {
+          "file": "apps/node/tunnel/tunnel_test.go",
+          "hash": "8409680793111827636"
+        },
+        {
+          "file": "apps/node/types/types.go",
+          "hash": "10061598535257521362"
+        },
+        {
+          "file": "apps/node/types/types_test.go",
+          "hash": "13660771156494856554"
+        },
+        {
+          "file": "apps/node/websocket/hub.go",
+          "hash": "18170312627707065775"
+        }
+      ],
+      "proxy-addon": [
+        {
+          "file": "apps/node/addon/proxy/main.go",
+          "hash": "5933046207465271436"
+        },
+        {
+          "file": "apps/node/addon/proxy/main_test.go",
+          "hash": "11350236919136910667"
+        },
+        {
+          "file": "apps/node/addon/proxy/project.json",
+          "hash": "9379972134937262346"
+        }
+      ],
       "topology-gen": [
-        {
-          "file": "apps/topology-gen/ARCHITECTURE.md",
-          "hash": "13608061389322921246"
-        },
-        {
-          "file": "apps/topology-gen/CHANGELOG.md",
-          "hash": "2147029569913816963"
-        },
-        {
-          "file": "apps/topology-gen/EXAMPLES.md",
-          "hash": "2963493087588459920"
-        },
-        {
-          "file": "apps/topology-gen/INDEX.md",
-          "hash": "1183347469946002422"
-        },
-        {
-          "file": "apps/topology-gen/Makefile",
-          "hash": "2218194246083191914"
-        },
-        {
-          "file": "apps/topology-gen/QUICKSTART.md",
-          "hash": "2139241739804899890"
-        },
-        {
-          "file": "apps/topology-gen/README.md",
-          "hash": "6016323875244015067"
-        },
-        {
-          "file": "apps/topology-gen/SUMMARY.md",
-          "hash": "1758467161210547650"
-        },
-        {
-          "file": "apps/topology-gen/TESTING.md",
-          "hash": "1207669511432249495"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/keys/authority/authorityKey1.pem",
-          "hash": "11254250654417991451"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/keys/key-mapping.json",
-          "hash": "15095036297273335609"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/keys/serviceKey1.pem",
-          "hash": "10319052199214382545"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/keys/serviceKey2.pem",
-          "hash": "4442172374972485906"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/keys/serviceKey3.pem",
-          "hash": "6764720607200838951"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/keys/serviceKey4.pem",
-          "hash": "16090953538509479986"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/keys/serviceKey5.pem",
-          "hash": "4254413725486772690"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node1/node-identity.pem",
-          "hash": "13086139000731775650"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node1/services/serviceKey1/fig1.json",
-          "hash": "2976358109546306470"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node1/services/serviceKey1/fig2.json",
-          "hash": "10129559875138525058"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node1/services/serviceKey1/serviceKey1.pem",
-          "hash": "10319052199214382545"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node1/services/serviceKey5/fig2.json",
-          "hash": "579582140014188380"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node1/services/serviceKey5/serviceKey5.pem",
-          "hash": "4254413725486772690"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node1/services/services.json",
-          "hash": "7890637999785773083"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node1/start-node.bat",
-          "hash": "15422087260824680905"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node1/start-node.ps1",
-          "hash": "13109430342747194507"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node1/start-node.sh",
-          "hash": "16420359483011446981"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node2/node-identity.pem",
-          "hash": "15933146146675532471"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node2/services/serviceKey2/fig1.json",
-          "hash": "11396256144811962501"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node2/services/serviceKey2/serviceKey2.pem",
-          "hash": "4442172374972485906"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node2/services/services.json",
-          "hash": "4353483718880572886"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node2/start-node.bat",
-          "hash": "16675906380662394928"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node2/start-node.ps1",
-          "hash": "11887807447456280692"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node2/start-node.sh",
-          "hash": "13038158115303851972"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node3/services/serviceKey3/fig2.json",
-          "hash": "16447146052429332399"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node3/services/serviceKey3/serviceKey3.pem",
-          "hash": "6764720607200838951"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node3/services/services.json",
-          "hash": "17379990471320051751"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node3/start-node.bat",
-          "hash": "5724327261484128850"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node3/start-node.ps1",
-          "hash": "18328048792185188307"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node3/start-node.sh",
-          "hash": "13259914012717064948"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node4/services/serviceKey4/fig2.json",
-          "hash": "15105227876895866914"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node4/services/serviceKey4/serviceKey4.pem",
-          "hash": "16090953538509479986"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node4/services/services.json",
-          "hash": "6705064777204243467"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node4/start-node.bat",
-          "hash": "12505248826027819589"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node4/start-node.ps1",
-          "hash": "11853644524674620455"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node4/start-node.sh",
-          "hash": "4517073509024835720"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node5/services/serviceKey2/fig1.json",
-          "hash": "12668119344715190190"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node5/services/serviceKey2/serviceKey2.pem",
-          "hash": "4442172374972485906"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node5/services/services.json",
-          "hash": "4353483718880572886"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node5/start-node.bat",
-          "hash": "16277508101158219020"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node5/start-node.ps1",
-          "hash": "4184730196729218993"
-        },
-        {
-          "file": "apps/topology-gen/demo-network/nodes/node5/start-node.sh",
-          "hash": "669813648188409262"
-        },
         {
           "file": "apps/topology-gen/example-config.json",
           "hash": "3608648757639270463"
@@ -444,43 +496,15 @@
         },
         {
           "file": "apps/topology-gen/go.mod",
-          "hash": "5821179108928395039"
+          "hash": "5559822499414625308"
         },
         {
           "file": "apps/topology-gen/go.sum",
-          "hash": "15450757260827107971"
+          "hash": "10278948187505699513"
         },
         {
           "file": "apps/topology-gen/project.json",
           "hash": "1192457270242828597"
-        },
-        {
-          "file": "apps/topology-gen/show-key-mapping.ps1",
-          "hash": "1647344155909362524"
-        },
-        {
-          "file": "apps/topology-gen/test-all-features.ps1",
-          "hash": "8574941014994523751"
-        },
-        {
-          "file": "apps/topology-gen/test-invalid-config.json",
-          "hash": "1943378560464847135"
-        },
-        {
-          "file": "apps/topology-gen/test-key-load.go",
-          "hash": "10014222098868597900"
-        },
-        {
-          "file": "apps/topology-gen/test-key-types.go",
-          "hash": "10962166943221269881"
-        },
-        {
-          "file": "apps/topology-gen/verify-authority-signatures.ps1",
-          "hash": "16870600512993080399"
-        },
-        {
-          "file": "apps/topology-gen/verify-keys.ps1",
-          "hash": "4145280482880284964"
         }
       ],
       "web": [
@@ -599,204 +623,6 @@
         {
           "file": "apps/web/webpack.config.js",
           "hash": "12931990832971813614"
-        }
-      ],
-      "node": [
-        {
-          "file": "apps/node/BUILD.md",
-          "hash": "12497906911054543417"
-        },
-        {
-          "file": "apps/node/CONFIG.md",
-          "hash": "16915639725162812114"
-        },
-        {
-          "file": "apps/node/Makefile",
-          "hash": "6026141582236318977"
-        },
-        {
-          "file": "apps/node/README.md",
-          "hash": "12264930690763599024"
-        },
-        {
-          "file": "apps/node/addon/build_test_addon.ps1",
-          "hash": "11716211734030999174"
-        },
-        {
-          "file": "apps/node/addon/build_test_addon.sh",
-          "hash": "135341143183301665"
-        },
-        {
-          "file": "apps/node/addon/manager.go",
-          "hash": "17114162507253822014"
-        },
-        {
-          "file": "apps/node/addon/sdk/mux.go",
-          "hash": "498983795532555583"
-        },
-        {
-          "file": "apps/node/addon/sdk/sdk.go",
-          "hash": "18225981939654112288"
-        },
-        {
-          "file": "apps/node/addon/testaddon/main.go",
-          "hash": "18330073507830850335"
-        },
-        {
-          "file": "apps/node/bootstraps.json",
-          "hash": "16883285338249191103"
-        },
-        {
-          "file": "apps/node/build.ps1",
-          "hash": "16035548846225982991"
-        },
-        {
-          "file": "apps/node/build.sh",
-          "hash": "6573827553964334333"
-        },
-        {
-          "file": "apps/node/common/types.go",
-          "hash": "17577735101001359323"
-        },
-        {
-          "file": "apps/node/config-with-bootstrap-file.json",
-          "hash": "2214912740462581998"
-        },
-        {
-          "file": "apps/node/config-with-inline-bootstraps.json",
-          "hash": "17124939794248709769"
-        },
-        {
-          "file": "apps/node/connection/manager.go",
-          "hash": "7348438529143518444"
-        },
-        {
-          "file": "apps/node/crypto/manager.go",
-          "hash": "11553351962105448144"
-        },
-        {
-          "file": "apps/node/crypto/manager_test.go",
-          "hash": "6259494591698519903"
-        },
-        {
-          "file": "apps/node/discovery/manager.go",
-          "hash": "7342309580551806215"
-        },
-        {
-          "file": "apps/node/events/broadcaster.go",
-          "hash": "16133524400742904875"
-        },
-        {
-          "file": "apps/node/events/broadcaster_test.go",
-          "hash": "7282444932027930871"
-        },
-        {
-          "file": "apps/node/example-node-config.json",
-          "hash": "802119338957685326"
-        },
-        {
-          "file": "apps/node/go.mod",
-          "hash": "723072134170598224"
-        },
-        {
-          "file": "apps/node/go.sum",
-          "hash": "7832962782786712339"
-        },
-        {
-          "file": "apps/node/interfaces/interfaces.go",
-          "hash": "1499633977457008342"
-        },
-        {
-          "file": "apps/node/libp2p-http/handler.go",
-          "hash": "8518521567490502907"
-        },
-        {
-          "file": "apps/node/main.go",
-          "hash": "8599636913190465545"
-        },
-        {
-          "file": "apps/node/management-server/handlers/basic.go",
-          "hash": "2069918063414116446"
-        },
-        {
-          "file": "apps/node/management-server/handlers/libp2p.go",
-          "hash": "18213346375035175591"
-        },
-        {
-          "file": "apps/node/management-server/handlers/peers.go",
-          "hash": "5117428265032634928"
-        },
-        {
-          "file": "apps/node/management-server/handlers/proxy.go",
-          "hash": "17632892210976460484"
-        },
-        {
-          "file": "apps/node/management-server/handlers/router.go",
-          "hash": "14976486265624051502"
-        },
-        {
-          "file": "apps/node/management-server/handlers/service.go",
-          "hash": "6239276063958115762"
-        },
-        {
-          "file": "apps/node/management-server/handlers/websocket.go",
-          "hash": "8056671418335414282"
-        },
-        {
-          "file": "apps/node/management-server/server.go",
-          "hash": "9893816743886595893"
-        },
-        {
-          "file": "apps/node/management-server/types.go",
-          "hash": "341061336045324708"
-        },
-        {
-          "file": "apps/node/minimal-test-config.json",
-          "hash": "6480187215815098862"
-        },
-        {
-          "file": "apps/node/node/node.go",
-          "hash": "10086363948405260867"
-        },
-        {
-          "file": "apps/node/project.json",
-          "hash": "1430012641284487202"
-        },
-        {
-          "file": "apps/node/scripts/diagnose-discovery.ps1",
-          "hash": "2313499952496617768"
-        },
-        {
-          "file": "apps/node/service/manager.go",
-          "hash": "9480334881029264480"
-        },
-        {
-          "file": "apps/node/test-config.json",
-          "hash": "16385193219027061897"
-        },
-        {
-          "file": "apps/node/tools/Eula.txt",
-          "hash": "16430386000327185298"
-        },
-        {
-          "file": "apps/node/tools/Handle.zip",
-          "hash": "5905244163270287135"
-        },
-        {
-          "file": "apps/node/transport/filter.go",
-          "hash": "1553738618204047380"
-        },
-        {
-          "file": "apps/node/types/types.go",
-          "hash": "10061598535257521362"
-        },
-        {
-          "file": "apps/node/types/types_test.go",
-          "hash": "13660771156494856554"
-        },
-        {
-          "file": "apps/node/websocket/hub.go",
-          "hash": "18170312627707065775"
         }
       ]
     }

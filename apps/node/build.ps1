@@ -55,8 +55,19 @@ if (-not $MetadataOnly) {
         Remove-Item -Path "$OutputDir\win\*", "$OutputDir\linux\*", "$OutputDir\osx\*" -Force -ErrorAction SilentlyContinue
     }
 
-    # Create directories
+    # Create directories for build outputs
     New-Item -ItemType Directory -Path "$OutputDir\win", "$OutputDir\linux", "$OutputDir\osx" -Force | Out-Null
+
+    # Create debug directories for each platform
+    Write-Host "Creating debug folder structure..." -ForegroundColor Cyan
+    $debugPlatforms = @("win", "linux", "osx")
+    $debugSubdirs = @("addons", "figs", "services")
+    foreach ($platform in $debugPlatforms) {
+        foreach ($subdir in $debugSubdirs) {
+            New-Item -ItemType Directory -Path "$OutputDir\debug\$platform\$subdir" -Force | Out-Null
+        }
+    }
+    Write-Host "  Created debug/{win,linux,osx}/{addons,figs,services}" -ForegroundColor Gray
 } else {
     # For metadata only, just ensure output directory exists
     New-Item -ItemType Directory -Path "$OutputDir" -Force | Out-Null
@@ -114,6 +125,29 @@ if (-not $MetadataOnly) {
     # Reset environment
     $env:GOOS = ""
     $env:GOARCH = ""
+
+    # Copy debug startup scripts to each platform directory
+    Write-Host "Copying debug startup scripts..." -ForegroundColor Cyan
+    $ScriptsDir = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "scripts"
+
+    # Windows - copy .bat and .ps1 scripts
+    if (Test-Path "$ScriptsDir\start-debug.ps1") {
+        Copy-Item "$ScriptsDir\start-debug.ps1" "$OutputDir\win\start-debug.ps1" -Force
+        Copy-Item "$ScriptsDir\start-debug.bat" "$OutputDir\win\start-debug.bat" -Force
+        Write-Host "  Copied Windows debug scripts" -ForegroundColor Gray
+    }
+
+    # Linux - copy .sh script
+    if (Test-Path "$ScriptsDir\start-debug.sh") {
+        Copy-Item "$ScriptsDir\start-debug.sh" "$OutputDir\linux\start-debug.sh" -Force
+        Write-Host "  Copied Linux debug script" -ForegroundColor Gray
+    }
+
+    # macOS - copy .sh script
+    if (Test-Path "$ScriptsDir\start-debug.sh") {
+        Copy-Item "$ScriptsDir\start-debug.sh" "$OutputDir\osx\start-debug.sh" -Force
+        Write-Host "  Copied macOS debug script" -ForegroundColor Gray
+    }
 }
 
 # Calculate hashes and sizes for built binaries

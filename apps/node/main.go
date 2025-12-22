@@ -67,6 +67,10 @@ type NodeConfigFile struct {
 	AllowInsecureFigs                *bool            `json:"allowInsecureFigs,omitempty"`
 	OverrideTransportRestrictions    *bool            `json:"overrideTransportRestrictions,omitempty"`
 	Bootstraps                       *BootstrapsValue `json:"bootstraps,omitempty"` // Optional bootstrap peer multiaddrs (inline array or file path)
+	// Tunnel configuration
+	TunnelEnabled        *bool    `json:"tunnelEnabled,omitempty"`        // Enable TCP tunnel protocol handler
+	TunnelAuthToken      *string  `json:"tunnelAuthToken,omitempty"`      // Auth token required for tunnel API
+	TunnelAllowedTargets []string `json:"tunnelAllowedTargets,omitempty"` // Allowed target hosts for outbound tunnels
 }
 
 // Command line flags
@@ -92,6 +96,9 @@ var (
 	allowInsecureFigs = flag.Bool("allow-insecure-figs", false, "Allow loading fig files with invalid or missing signatures (SECURITY RISK)")
 	// Transport restriction flags
 	overrideTransportRestrictions = flag.Bool("override-transport-restrictions", false, "Allow connections even if transport doesn't match fig restrictions")
+	// Tunnel configuration flags
+	tunnelEnabled   = flag.Bool("tunnel-enabled", true, "Enable TCP tunnel protocol handler for peer-to-peer TCP tunneling")
+	tunnelAuthToken = flag.String("tunnel-auth-token", "", "Auth token required for tunnel API endpoints (optional)")
 )
 
 func main() {
@@ -322,6 +329,10 @@ func loadConfig() (*nodePkg.Config, error) {
 		BeaconPeerIDDirectOnly:           boolValue("beacon-peerid-direct-only", beaconPeerIDDirectOnly, fileConfig.BeaconPeerIDDirectOnly, false),
 		OverrideTransportRestrictions:    boolValue("override-transport-restrictions", overrideTransportRestrictions, fileConfig.OverrideTransportRestrictions, false),
 		Bootstraps:                       bootstraps, // Bootstraps can only be set via config file
+		// Tunnel configuration
+		TunnelEnabled:        boolValue("tunnel-enabled", tunnelEnabled, fileConfig.TunnelEnabled, true),
+		TunnelAuthToken:      stringValue(tunnelAuthToken, fileConfig.TunnelAuthToken),
+		TunnelAllowedTargets: fileConfig.TunnelAllowedTargets, // Can only be set via config file
 	}
 
 	// Handle addonsDir separately since it's not part of node.Config

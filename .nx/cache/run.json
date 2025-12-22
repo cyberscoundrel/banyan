@@ -1,40 +1,18 @@
 {
   "run": {
-    "command": "nx create-topology topology-gen --config=example-config.json --name=demo",
-    "startTime": "2025-12-08T03:21:55.105Z",
-    "endTime": "2025-12-08T03:24:23.365Z",
+    "command": "nx run proxy-addon:build:release",
+    "startTime": "2025-12-22T04:52:04.076Z",
+    "endTime": "2025-12-22T04:52:21.358Z",
     "inner": false
   },
   "tasks": [
     {
-      "taskId": "node:build",
-      "target": "build",
-      "projectName": "node",
-      "hash": "1882893236268554070",
-      "startTime": "2025-12-08T03:21:55.149Z",
-      "endTime": "2025-12-08T03:24:11.135Z",
-      "params": "",
-      "cacheStatus": "cache-miss",
-      "status": 0
-    },
-    {
-      "taskId": "topology-gen:build",
-      "target": "build",
-      "projectName": "topology-gen",
-      "hash": "3320597920781838606",
-      "startTime": "2025-12-08T03:24:11.320Z",
-      "endTime": "2025-12-08T03:24:18.372Z",
-      "params": "",
-      "cacheStatus": "cache-miss",
-      "status": 0
-    },
-    {
-      "taskId": "topology-gen:create-topology",
-      "target": "create-topology",
-      "projectName": "topology-gen",
-      "hash": "13869587454499852516",
-      "startTime": "2025-12-08T03:24:18.434Z",
-      "endTime": "2025-12-08T03:24:23.333Z",
+      "taskId": "proxy-addon:build:release",
+      "target": "build:release",
+      "projectName": "proxy-addon",
+      "hash": "6620762333307630669",
+      "startTime": "2025-12-22T04:52:04.104Z",
+      "endTime": "2025-12-22T04:52:21.352Z",
       "params": "",
       "cacheStatus": "cache-miss",
       "status": 0

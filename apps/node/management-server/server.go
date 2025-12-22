@@ -117,6 +117,7 @@ func (ms *ManagementServer) registerRoutes(mux *http.ServeMux) {
 	wsHandlers := handlers.NewWebSocketHandlers(ms.hub)
 	serviceHandlers := handlers.NewServiceHandlers(ms.node, ms.BroadcastEvent)
 	routerHandlers := handlers.NewRouterHandlers(ms.node)
+	tunnelHandlers := handlers.NewTunnelHandlers(ms.node)
 
 	// Basic endpoints
 	mux.HandleFunc("/", basicHandlers.HandleRequest)
@@ -130,6 +131,7 @@ func (ms *ManagementServer) registerRoutes(mux *http.ServeMux) {
 	// Network management endpoints
 	mux.HandleFunc("/network/connections", libp2pHandlers.HandleConnections)
 	mux.HandleFunc("/network/connect/", libp2pHandlers.HandleConnectToPeer)
+	mux.HandleFunc("/network/connect-multiaddr", libp2pHandlers.HandleConnectWithMultiaddr)
 	mux.HandleFunc("/network/peers/add", peerHandlers.HandleAddTrackedPeer)
 	mux.HandleFunc("/network/peers/all", peerHandlers.HandleGetAllPeers)
 
@@ -162,6 +164,11 @@ func (ms *ManagementServer) registerRoutes(mux *http.ServeMux) {
 	// Router management endpoints
 	mux.HandleFunc("/router/add", routerHandlers.HandleAddRoute)
 	mux.HandleFunc("/router/list", routerHandlers.HandleGetRoutes)
+
+	// Tunnel management endpoints (for proxy addon and peer-to-peer TCP tunneling)
+	mux.HandleFunc("/tunnel/open", tunnelHandlers.HandleOpenTunnel)
+	mux.HandleFunc("/tunnel/close/", tunnelHandlers.HandleCloseTunnel)
+	mux.HandleFunc("/tunnel/list", tunnelHandlers.HandleListTunnels)
 
 	// WebSocket endpoint for event streaming
 	mux.HandleFunc("/events/subscribe", wsHandlers.HandleEventSubscribe)
