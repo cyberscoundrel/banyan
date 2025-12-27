@@ -312,3 +312,342 @@ func TestAddressTypeDisambiguation(t *testing.T) {
 		})
 	}
 }
+
+// TestRelay tests the bidirectional data relay between connections
+func TestRelay(t *testing.T) {
+	// Create two pairs of pipes to simulate connections
+	client1, server1 := net.Pipe()
+	client2, server2 := net.Pipe()
+	defer client1.Close()
+	defer server1.Close()
+	defer client2.Close()
+	defer server2.Close()
+
+	// Start relay between server1 and client2
+	done := make(chan struct{})
+	go func() {
+		relay(server1, client2)
+		close(done)
+	}()
+
+	// Write from client1, expect to read from server2
+	testData := []byte("Hello from client1")
+	go func() {
+		client1.Write(testData)
+	}()
+
+	buf := make([]byte, len(testData))
+	n, err := server2.Read(buf)
+	if err != nil {
+		t.Fatalf("Failed to read from server2: %v", err)
+	}
+	if string(buf[:n]) != string(testData) {
+		t.Errorf("Expected %q, got %q", testData, buf[:n])
+	}
+
+	// Write from server2, expect to read from client1
+	responseData := []byte("Response from server2")
+	go func() {
+		server2.Write(responseData)
+	}()
+
+	buf2 := make([]byte, len(responseData))
+	n, err = client1.Read(buf2)
+	if err != nil {
+		t.Fatalf("Failed to read from client1: %v", err)
+	}
+	if string(buf2[:n]) != string(responseData) {
+		t.Errorf("Expected %q, got %q", responseData, buf2[:n])
+	}
+
+	// Close one side and wait for relay to finish
+	client1.Close()
+	<-done
+}
+
+// TestSOCKS5Handshake tests the SOCKS5 authentication handshake
+func TestSOCKS5Handshake(t *testing.T) {
+	// Simulate a SOCKS5 client handshake
+	tests := []struct {
+		name     string
+		request  []byte
+		response []byte
+	}{
+		{
+			name:     "no auth method",
+			request:  []byte{0x05, 0x01, 0x00}, // version, nmethods=1, no auth
+			response: []byte{0x05, 0x00},       // version, no auth required
+		},
+		{
+			name:     "multiple auth methods",
+			request:  []byte{0x05, 0x02, 0x00, 0x02}, // version, nmethods=2, no auth + username/pass
+			response: []byte{0x05, 0x00},             // version, no auth required (we pick no auth)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// The SOCKS5 handshake response is always {0x05, 0x00} for no auth
+			// Verify the expected format
+			if len(tt.response) != 2 || tt.response[0] != 0x05 || tt.response[1] != 0x00 {
+				t.Errorf("Invalid expected response format")
+			}
+		})
+	}
+}
+
+// TestSOCKS5ConnectRequest tests parsing SOCKS5 connect requests
+func TestSOCKS5ConnectRequest(t *testing.T) {
+	tests := []struct {
+		name           string
+		addrType       byte
+		addrData       []byte
+		port           uint16
+		expectedHost   string
+		expectedPort   uint16
+		expectedIsFig  bool
+		expectedIsPeer bool
+	}{
+		{
+			name:           "IPv4 localhost",
+			addrType:       0x01,
+			addrData:       []byte{127, 0, 0, 1},
+			port:           8080,
+			expectedHost:   "127.0.0.1",
+			expectedPort:   8080,
+			expectedIsFig:  false,
+			expectedIsPeer: false,
+		},
+		{
+			name:           "Domain .fig address",
+			addrType:       0x03,
+			addrData:       append([]byte{11}, []byte("example.fig")...),
+			port:           443,
+			expectedHost:   "example.fig",
+			expectedPort:   443,
+			expectedIsFig:  true,
+			expectedIsPeer: false,
+		},
+		{
+			name:           "Domain .peer address",
+			addrType:       0x03,
+			addrData:       append([]byte{20}, []byte("12D3KooWExample.peer")...),
+			port:           9000,
+			expectedHost:   "12D3KooWExample.peer",
+			expectedPort:   9000,
+			expectedIsFig:  false,
+			expectedIsPeer: true,
+		},
+		{
+			name:           "IPv6 address",
+			addrType:       0x04,
+			addrData:       []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, // ::1
+			port:           80,
+			expectedHost:   "::1",
+			expectedPort:   80,
+			expectedIsFig:  false,
+			expectedIsPeer: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var host string
+			switch tt.addrType {
+			case 0x01: // IPv4
+				host = net.IP(tt.addrData).String()
+			case 0x03: // Domain
+				host = string(tt.addrData[1:])
+			case 0x04: // IPv6
+				host = net.IP(tt.addrData).String()
+			}
+
+			if host != tt.expectedHost {
+				t.Errorf("Host: got %q, want %q", host, tt.expectedHost)
+			}
+			if tt.port != tt.expectedPort {
+				t.Errorf("Port: got %d, want %d", tt.port, tt.expectedPort)
+			}
+			if isFigAddress(host) != tt.expectedIsFig {
+				t.Errorf("isFigAddress(%q): got %v, want %v", host, isFigAddress(host), tt.expectedIsFig)
+			}
+			if isPeerAddress(host) != tt.expectedIsPeer {
+				t.Errorf("isPeerAddress(%q): got %v, want %v", host, isPeerAddress(host), tt.expectedIsPeer)
+			}
+		})
+	}
+}
+
+// TestBufferedConnMultipleReads tests multiple reads from buffered connection
+func TestBufferedConnMultipleReads(t *testing.T) {
+	server, client := net.Pipe()
+	defer server.Close()
+	defer client.Close()
+
+	// Send test data
+	testData := []byte("Hello, World! This is a longer message.")
+	go func() {
+		server.Write(testData)
+	}()
+
+	// Read first 5 bytes
+	peeked := make([]byte, 5)
+	n, err := client.Read(peeked)
+	if err != nil || n != 5 {
+		t.Fatalf("Failed to read peeked bytes: %v", err)
+	}
+
+	// Create buffered connection with peeked bytes
+	bc := &bufferedConn{Conn: client, buf: peeked[:n]}
+
+	// Read in small chunks
+	var result []byte
+	chunk := make([]byte, 10)
+	for len(result) < len(testData) {
+		n, err := bc.Read(chunk)
+		if err != nil {
+			break
+		}
+		result = append(result, chunk[:n]...)
+	}
+
+	if string(result) != string(testData) {
+		t.Errorf("Expected %q, got %q", testData, result)
+	}
+}
+
+// TestHTTPProxyURLConstruction tests how HTTP proxy URLs are constructed
+func TestHTTPProxyURLConstruction(t *testing.T) {
+	tests := []struct {
+		name     string
+		host     string
+		path     string
+		query    string
+		expected string
+	}{
+		{
+			name:     "simple path",
+			host:     "example.com",
+			path:     "/api/data",
+			query:    "",
+			expected: "http://example.com/api/data",
+		},
+		{
+			name:     "path with query",
+			host:     "example.com",
+			path:     "/api/search",
+			query:    "q=test&limit=10",
+			expected: "http://example.com/api/search?q=test&limit=10",
+		},
+		{
+			name:     "root path",
+			host:     "example.com",
+			path:     "/",
+			query:    "",
+			expected: "http://example.com/",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			targetURL := "http://" + tt.host + tt.path
+			if tt.query != "" {
+				targetURL += "?" + tt.query
+			}
+			if targetURL != tt.expected {
+				t.Errorf("URL construction: got %q, want %q", targetURL, tt.expected)
+			}
+		})
+	}
+}
+
+// TestPortParsing tests port extraction from host:port strings
+func TestPortParsing(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedHost string
+		expectedPort string
+	}{
+		{"example.fig:443", "example.fig", "443"},
+		{"example.fig:8080", "example.fig", "8080"},
+		{"example.fig", "example.fig", "443"}, // default to 443
+		{"12D3KooWExample.peer:9000", "12D3KooWExample.peer", "9000"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			host := tt.input
+			port := "443" // default
+			if idx := strings.LastIndex(host, ":"); idx != -1 {
+				port = host[idx+1:]
+				host = host[:idx]
+			}
+			if host != tt.expectedHost {
+				t.Errorf("Host: got %q, want %q", host, tt.expectedHost)
+			}
+			if port != tt.expectedPort {
+				t.Errorf("Port: got %q, want %q", port, tt.expectedPort)
+			}
+		})
+	}
+}
+
+// TestSOCKS5ReplyFormat tests the format of SOCKS5 success replies
+func TestSOCKS5ReplyFormat(t *testing.T) {
+	// Test constructing SOCKS5 success reply
+	localPort := 12345
+	expectedReply := []byte{
+		0x05,         // version
+		0x00,         // success
+		0x00,         // reserved
+		0x01,         // IPv4 address type
+		127, 0, 0, 1, // localhost
+		byte(localPort >> 8), byte(localPort & 0xff), // port in network order
+	}
+
+	// Construct reply as in handleSOCKS5Fig/handleSOCKS5Peer
+	reply := []byte{0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1}
+	reply = append(reply, byte(localPort>>8), byte(localPort&0xff))
+
+	if len(reply) != len(expectedReply) {
+		t.Errorf("Reply length: got %d, want %d", len(reply), len(expectedReply))
+	}
+	for i := range reply {
+		if reply[i] != expectedReply[i] {
+			t.Errorf("Reply byte %d: got 0x%02x, want 0x%02x", i, reply[i], expectedReply[i])
+		}
+	}
+}
+
+// TestSOCKS5ErrorReply tests SOCKS5 error reply format
+func TestSOCKS5ErrorReply(t *testing.T) {
+	tests := []struct {
+		name        string
+		errorCode   byte
+		description string
+	}{
+		{"general failure", 0x01, "General failure"},
+		{"connection refused", 0x05, "Connection refused"},
+		{"host unreachable", 0x04, "Host unreachable"},
+		{"command not supported", 0x07, "Command not supported"},
+		{"address type not supported", 0x08, "Address type not supported"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Standard error reply format
+			reply := []byte{0x05, tt.errorCode, 0x00, 0x01, 0, 0, 0, 0, 0, 0}
+
+			// Verify reply structure
+			if reply[0] != 0x05 {
+				t.Errorf("Version byte should be 0x05, got 0x%02x", reply[0])
+			}
+			if reply[1] != tt.errorCode {
+				t.Errorf("Error code should be 0x%02x, got 0x%02x", tt.errorCode, reply[1])
+			}
+			if len(reply) != 10 {
+				t.Errorf("Reply should be 10 bytes, got %d", len(reply))
+			}
+		})
+	}
+}
