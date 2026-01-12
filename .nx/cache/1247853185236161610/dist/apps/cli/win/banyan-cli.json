@@ -1,0 +1,4 @@
+{
+    "webPort":  8080,
+    "nodeExecutable":  "../../node/win/banyan.exe"
+}

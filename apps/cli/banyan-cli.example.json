@@ -1,0 +1,10 @@
+{
+  "nodeExecutable": "",
+  "nodeConfigPath": "",
+  "defaultNodeAddress": "",
+  "webPort": 8080,
+  "noWeb": false,
+  "noSplash": false,
+  "lastNodeAddress": ""
+}
+
