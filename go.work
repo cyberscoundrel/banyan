@@ -3,9 +3,8 @@ go 1.24.6
 toolchain go1.24.11
 
 use (
+	./apps/cli
 	./apps/node
 	./apps/topology-gen
 	./packages/addon-sdk
-	./packages/transports/i2p
-	./packages/transports/nym
 )

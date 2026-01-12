@@ -213,6 +213,256 @@
       "nx/target-defaults"
     ]
   },
+  "apps/cli": {
+    "root": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "name": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "$schema": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "projectType": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "sourceRoot": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "tags": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "tags.type:app": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "tags.lang:go": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "namedInputs": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "namedInputs.go": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.executor": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.inputs": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.outputs": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options.cwd": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options.command": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:production": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:production.executor": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:production.inputs": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:production.outputs": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:production.options": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:production.options.cwd": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:production.options.command": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:unix": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:unix.executor": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:unix.inputs": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:unix.outputs": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:unix.options": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:unix.options.cwd": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build:unix.options.command": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.executor": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.inputs": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.options": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.options.cwd": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.options.command": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.executor": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.inputs": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.options": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.options.cwd": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.lint.options.command": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.fmt": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.fmt.executor": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.fmt.options": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.fmt.options.cwd": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.fmt.options.command": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy.executor": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy.options": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy.options.cwd": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.tidy.options.command": [
+      "apps/cli/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.dependsOn": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.cache": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.test.dependsOn": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.test.cache": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.test.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.lint.cache": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.lint.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
+    ]
+  },
   "apps/node": {
     "root": [
       "apps/node/project.json",
