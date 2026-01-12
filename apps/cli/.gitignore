@@ -1,0 +1,24 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+banyan-cli
+
+# Config files (should be created by user)
+banyan-cli.json
+
+# Web build output (should be built by user)
+server/web/dist/
+!server/web/dist/index.html
+
+# Web dependencies
+server/web/node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
