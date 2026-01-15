@@ -1,8 +1,0 @@
-[2m> [22mgo build -o dist/apps/node/debug/win/addons/proxy-addon.exe ./apps/node/addon/proxy
-
-[2m> [22mpowershell -Command "$env:GOOS='linux'; $env:GOARCH='amd64'; go build -o dist/apps/node/debug/linux/addons/proxy-addon ./apps/node/addon/proxy"
-
-[2m> [22mpowershell -Command "$env:GOOS='darwin'; $env:GOARCH='amd64'; go build -o dist/apps/node/debug/osx/addons/proxy-addon-amd64 ./apps/node/addon/proxy"
-
-[2m> [22mpowershell -Command "$env:GOOS='darwin'; $env:GOARCH='arm64'; go build -o dist/apps/node/debug/osx/addons/proxy-addon-arm64 ./apps/node/addon/proxy"
-
