@@ -8,13 +8,28 @@ import (
 	"net/http"
 	"strings"
 
-	//"strings"
-
 	"banyan/management-server/handlers"
 	nodePkg "banyan/node"
 	"banyan/types"
 	"banyan/websocket"
 )
+
+// corsMiddleware adds CORS headers to allow WebUI cross-origin requests
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		// Handle preflight OPTIONS request
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
 
 // StartManagementServer starts the HTTP management/API server and returns the server instance and URL
 func StartManagementServer(node *nodePkg.Node) (*ManagementServer, string, error) {
@@ -22,12 +37,11 @@ func StartManagementServer(node *nodePkg.Node) (*ManagementServer, string, error
 	hub := websocket.NewHub()
 	go hub.Run()
 
-	// Register the hub with the node's event broadcaster if available
-	if eventBroadcaster, ok := interface{}(node).(interface{ GetEventBroadcaster() interface{} }); ok {
-		if broadcaster := eventBroadcaster.GetEventBroadcaster(); broadcaster != nil {
-			// This would require adding a Subscribe method to the broadcaster
-			// For now, we'll keep the current direct connection
-		}
+	// Register the hub with the node's event broadcaster so events from
+	// connection/discovery managers are forwarded to WebSocket clients
+	if broadcaster := node.GetEventBroadcaster(); broadcaster != nil {
+		broadcaster.Subscribe(hub)
+		log.Printf("WebSocket hub subscribed to event broadcaster")
 	}
 
 	// Type assert to concrete type for now - this is a temporary bridge
@@ -50,6 +64,9 @@ func StartManagementServer(node *nodePkg.Node) (*ManagementServer, string, error
 	// Store mux for dynamic mounts
 	managementServer.mux = mux
 
+	// Wrap mux with CORS middleware for WebUI cross-origin requests
+	corsHandler := corsMiddleware(mux)
+
 	// Listen on a random available port
 	listener, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -57,7 +74,7 @@ func StartManagementServer(node *nodePkg.Node) (*ManagementServer, string, error
 	}
 
 	managementServer.listener = listener
-	managementServer.server = &http.Server{Handler: mux}
+	managementServer.server = &http.Server{Handler: corsHandler}
 
 	port := listener.Addr().(*net.TCPAddr).Port
 	serverURL := fmt.Sprintf("http://localhost:%d", port)
@@ -79,6 +96,7 @@ func StartManagementServer(node *nodePkg.Node) (*ManagementServer, string, error
 	log.Println("  Node Management:")
 	log.Printf("    GET %s/node/status - Get node status", serverURL)
 	log.Printf("    GET %s/node/ping - Ping node", serverURL)
+	log.Printf("    POST %s/node/shutdown - Shutdown node (localhost only)", serverURL)
 	log.Println("  Network Management:")
 	log.Printf("    GET %s/network/connections - Get peer connections", serverURL)
 	log.Printf("    POST %s/network/connect/{peerID} - Connect to peer", serverURL)
@@ -127,6 +145,10 @@ func (ms *ManagementServer) registerRoutes(mux *http.ServeMux) {
 	// Node management endpoints
 	mux.HandleFunc("/node/status", libp2pHandlers.HandleStatus)
 	mux.HandleFunc("/node/ping", libp2pHandlers.HandleStatus) // Reuse status handler for ping
+	mux.HandleFunc("/node/shutdown", basicHandlers.HandleShutdown)
+
+	// Store basicHandlers so we can set the shutdown func later
+	ms.basicHandlers = basicHandlers
 
 	// Network management endpoints
 	mux.HandleFunc("/network/connections", libp2pHandlers.HandleConnections)
