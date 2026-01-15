@@ -1,18 +1,18 @@
 {
   "run": {
-    "command": "nx run proxy-addon:build:release",
-    "startTime": "2025-12-22T04:52:04.076Z",
-    "endTime": "2025-12-22T04:52:21.358Z",
+    "command": "nx run proxy-addon:build",
+    "startTime": "2026-01-15T03:26:20.117Z",
+    "endTime": "2026-01-15T03:26:25.537Z",
     "inner": false
   },
   "tasks": [
     {
-      "taskId": "proxy-addon:build:release",
-      "target": "build:release",
+      "taskId": "proxy-addon:build",
+      "target": "build",
       "projectName": "proxy-addon",
-      "hash": "6620762333307630669",
-      "startTime": "2025-12-22T04:52:04.104Z",
-      "endTime": "2025-12-22T04:52:21.352Z",
+      "hash": "15513802924233863440",
+      "startTime": "2026-01-15T03:26:20.151Z",
+      "endTime": "2026-01-15T03:26:25.521Z",
       "params": "",
       "cacheStatus": "cache-miss",
       "status": 0

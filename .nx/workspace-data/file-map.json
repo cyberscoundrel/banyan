@@ -10,35 +10,179 @@
   "fileMap": {
     "nonProjectFiles": [
       {
-        "file": ".gitignore",
-        "hash": "800054987742928026"
-      },
-      {
-        "file": "nx.json",
-        "hash": "11843248497900670785"
-      },
-      {
-        "file": "go.work.sum",
-        "hash": "10037963554268640838"
-      },
-      {
-        "file": "go.work",
-        "hash": "4508183606565560551"
-      },
-      {
         "file": "package-lock.json",
         "hash": "13625224223837716606"
+      },
+      {
+        "file": ".gitignore",
+        "hash": "16531781795177166592"
       },
       {
         "file": "tsconfig.base.json",
         "hash": "1999084922207282074"
       },
       {
+        "file": "test-proxy-nodes.sh",
+        "hash": "6682547109715113799"
+      },
+      {
+        "file": ".github/workflows/ci.yml",
+        "hash": "2066218783728373055"
+      },
+      {
+        "file": "nx.json",
+        "hash": "11843248497900670785"
+      },
+      {
         "file": "package.json",
         "hash": "9214069145436590123"
+      },
+      {
+        "file": "go.work",
+        "hash": "4508183606565560551"
+      },
+      {
+        "file": "go.work.sum",
+        "hash": "10037963554268640838"
+      },
+      {
+        "file": "test-proxy-nodes.ps1",
+        "hash": "10684637636333394916"
       }
     ],
     "projectFileMap": {
+      "web": [
+        {
+          "file": "apps/web/README.md",
+          "hash": "2939826187864019905"
+        },
+        {
+          "file": "apps/web/dist/bundle.45b740c1067c00eee8e3.js",
+          "hash": "7333742560244928346"
+        },
+        {
+          "file": "apps/web/dist/bundle.45b740c1067c00eee8e3.js.LICENSE.txt",
+          "hash": "7618840362865431088"
+        },
+        {
+          "file": "apps/web/dist/fig.svg",
+          "hash": "4699114804837250034"
+        },
+        {
+          "file": "apps/web/dist/index.html",
+          "hash": "432832988465056592"
+        },
+        {
+          "file": "apps/web/package-lock.json",
+          "hash": "13395237399400785808"
+        },
+        {
+          "file": "apps/web/package.json",
+          "hash": "5969301383918742019"
+        },
+        {
+          "file": "apps/web/postcss.config.js",
+          "hash": "10770016605268529981"
+        },
+        {
+          "file": "apps/web/project.json",
+          "hash": "16218808309983517376"
+        },
+        {
+          "file": "apps/web/public/fig.svg",
+          "hash": "4699114804837250034"
+        },
+        {
+          "file": "apps/web/public/index.html",
+          "hash": "10782650642866130812"
+        },
+        {
+          "file": "apps/web/src/App.tsx",
+          "hash": "2070094793957202851"
+        },
+        {
+          "file": "apps/web/src/components/Header.tsx",
+          "hash": "15147222187891603617"
+        },
+        {
+          "file": "apps/web/src/components/Layout.tsx",
+          "hash": "16401041691536365538"
+        },
+        {
+          "file": "apps/web/src/components/Sidebar.tsx",
+          "hash": "10804305681619533731"
+        },
+        {
+          "file": "apps/web/src/contexts/ThemeContext.tsx",
+          "hash": "9846128132464500130"
+        },
+        {
+          "file": "apps/web/src/index.css",
+          "hash": "15071719814928463000"
+        },
+        {
+          "file": "apps/web/src/index.tsx",
+          "hash": "8579623585675949219"
+        },
+        {
+          "file": "apps/web/src/pages/API.tsx",
+          "hash": "13029207746324393830"
+        },
+        {
+          "file": "apps/web/src/pages/Download.tsx",
+          "hash": "14339030568990893904"
+        },
+        {
+          "file": "apps/web/src/pages/Examples.tsx",
+          "hash": "13968754999639436252"
+        },
+        {
+          "file": "apps/web/src/pages/Future.tsx",
+          "hash": "4060239492115870433"
+        },
+        {
+          "file": "apps/web/src/pages/Home.tsx",
+          "hash": "4684072109265397450"
+        },
+        {
+          "file": "apps/web/src/pages/Transparency.tsx",
+          "hash": "4737445735413191509"
+        },
+        {
+          "file": "apps/web/src/pages/Troubleshooting.tsx",
+          "hash": "18096944100653691493"
+        },
+        {
+          "file": "apps/web/src/pages/Usage.tsx",
+          "hash": "2083436415826148100"
+        },
+        {
+          "file": "apps/web/tailwind.config.js",
+          "hash": "13578828273009200768"
+        },
+        {
+          "file": "apps/web/tsconfig.json",
+          "hash": "16107431015881188689"
+        },
+        {
+          "file": "apps/web/webpack.config.js",
+          "hash": "12931990832971813614"
+        }
+      ],
+      "proxy-addon": [
+        {
+          "file": "apps/node/addon/proxy/main.go",
+          "hash": "28022181124336351"
+        },
+        {
+          "file": "apps/node/addon/proxy/main_test.go",
+          "hash": "1606919907223611466"
+        },
+        {
+          "file": "apps/node/addon/proxy/project.json",
+          "hash": "8456609743843067223"
+        }
+      ],
       "transport-nym": [
         {
           "file": "packages/transports/nym/go.mod",
@@ -119,6 +263,24 @@
         {
           "file": "packages/transports/nym/transport/transport_test.go",
           "hash": "6756681452369521159"
+        }
+      ],
+      "addon-sdk": [
+        {
+          "file": "packages/addon-sdk/go.mod",
+          "hash": "3554654199364002846"
+        },
+        {
+          "file": "packages/addon-sdk/mux.go",
+          "hash": "498983795532555583"
+        },
+        {
+          "file": "packages/addon-sdk/project.json",
+          "hash": "9475059593893304887"
+        },
+        {
+          "file": "packages/addon-sdk/sdk.go",
+          "hash": "18225981939654112288"
         }
       ],
       "transport-i2p": [
@@ -217,24 +379,6 @@
         {
           "file": "packages/transports/i2p/utils_test.go",
           "hash": "11076224882423797375"
-        }
-      ],
-      "addon-sdk": [
-        {
-          "file": "packages/addon-sdk/go.mod",
-          "hash": "3554654199364002846"
-        },
-        {
-          "file": "packages/addon-sdk/mux.go",
-          "hash": "498983795532555583"
-        },
-        {
-          "file": "packages/addon-sdk/project.json",
-          "hash": "9475059593893304887"
-        },
-        {
-          "file": "packages/addon-sdk/sdk.go",
-          "hash": "18225981939654112288"
         }
       ],
       "node": [
@@ -364,7 +508,7 @@
         },
         {
           "file": "apps/node/management-server/handlers/libp2p.go",
-          "hash": "3330226657210193264"
+          "hash": "16963780002398454208"
         },
         {
           "file": "apps/node/management-server/handlers/peers.go",
@@ -471,20 +615,6 @@
           "hash": "18170312627707065775"
         }
       ],
-      "proxy-addon": [
-        {
-          "file": "apps/node/addon/proxy/main.go",
-          "hash": "5933046207465271436"
-        },
-        {
-          "file": "apps/node/addon/proxy/main_test.go",
-          "hash": "11350236919136910667"
-        },
-        {
-          "file": "apps/node/addon/proxy/project.json",
-          "hash": "9379972134937262346"
-        }
-      ],
       "topology-gen": [
         {
           "file": "apps/topology-gen/example-config.json",
@@ -505,124 +635,6 @@
         {
           "file": "apps/topology-gen/project.json",
           "hash": "1192457270242828597"
-        }
-      ],
-      "web": [
-        {
-          "file": "apps/web/README.md",
-          "hash": "2939826187864019905"
-        },
-        {
-          "file": "apps/web/dist/bundle.45b740c1067c00eee8e3.js",
-          "hash": "7333742560244928346"
-        },
-        {
-          "file": "apps/web/dist/bundle.45b740c1067c00eee8e3.js.LICENSE.txt",
-          "hash": "7618840362865431088"
-        },
-        {
-          "file": "apps/web/dist/fig.svg",
-          "hash": "4699114804837250034"
-        },
-        {
-          "file": "apps/web/dist/index.html",
-          "hash": "432832988465056592"
-        },
-        {
-          "file": "apps/web/package-lock.json",
-          "hash": "13395237399400785808"
-        },
-        {
-          "file": "apps/web/package.json",
-          "hash": "5969301383918742019"
-        },
-        {
-          "file": "apps/web/postcss.config.js",
-          "hash": "10770016605268529981"
-        },
-        {
-          "file": "apps/web/project.json",
-          "hash": "16218808309983517376"
-        },
-        {
-          "file": "apps/web/public/fig.svg",
-          "hash": "4699114804837250034"
-        },
-        {
-          "file": "apps/web/public/index.html",
-          "hash": "10782650642866130812"
-        },
-        {
-          "file": "apps/web/src/App.tsx",
-          "hash": "2070094793957202851"
-        },
-        {
-          "file": "apps/web/src/components/Header.tsx",
-          "hash": "15147222187891603617"
-        },
-        {
-          "file": "apps/web/src/components/Layout.tsx",
-          "hash": "16401041691536365538"
-        },
-        {
-          "file": "apps/web/src/components/Sidebar.tsx",
-          "hash": "10804305681619533731"
-        },
-        {
-          "file": "apps/web/src/contexts/ThemeContext.tsx",
-          "hash": "9846128132464500130"
-        },
-        {
-          "file": "apps/web/src/index.css",
-          "hash": "15071719814928463000"
-        },
-        {
-          "file": "apps/web/src/index.tsx",
-          "hash": "8579623585675949219"
-        },
-        {
-          "file": "apps/web/src/pages/API.tsx",
-          "hash": "13029207746324393830"
-        },
-        {
-          "file": "apps/web/src/pages/Download.tsx",
-          "hash": "14339030568990893904"
-        },
-        {
-          "file": "apps/web/src/pages/Examples.tsx",
-          "hash": "13968754999639436252"
-        },
-        {
-          "file": "apps/web/src/pages/Future.tsx",
-          "hash": "4060239492115870433"
-        },
-        {
-          "file": "apps/web/src/pages/Home.tsx",
-          "hash": "4684072109265397450"
-        },
-        {
-          "file": "apps/web/src/pages/Transparency.tsx",
-          "hash": "4737445735413191509"
-        },
-        {
-          "file": "apps/web/src/pages/Troubleshooting.tsx",
-          "hash": "18096944100653691493"
-        },
-        {
-          "file": "apps/web/src/pages/Usage.tsx",
-          "hash": "2083436415826148100"
-        },
-        {
-          "file": "apps/web/tailwind.config.js",
-          "hash": "13578828273009200768"
-        },
-        {
-          "file": "apps/web/tsconfig.json",
-          "hash": "16107431015881188689"
-        },
-        {
-          "file": "apps/web/webpack.config.js",
-          "hash": "12931990832971813614"
         }
       ]
     }

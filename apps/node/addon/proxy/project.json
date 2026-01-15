@@ -7,7 +7,7 @@
     "build": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "go build -o {args.output:-dist/addons/proxy-addon.exe} ./apps/node/addon/proxy",
+        "command": "go build -o dist/addons/proxy-addon.exe ./apps/node/addon/proxy",
         "cwd": "{workspaceRoot}"
       },
       "configurations": {

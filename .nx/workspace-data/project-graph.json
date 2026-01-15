@@ -177,7 +177,7 @@
           "build": {
             "executor": "nx:run-commands",
             "options": {
-              "command": "go build -o {args.output:-dist/addons/proxy-addon.exe} ./apps/node/addon/proxy",
+              "command": "go build -o dist/addons/proxy-addon.exe ./apps/node/addon/proxy",
               "cwd": ""
             },
             "configurations": {
@@ -9957,5 +9957,5 @@
   },
   "version": "6.0",
   "errors": [],
-  "computedAt": 1766381292260
+  "computedAt": 1768447629140
 }

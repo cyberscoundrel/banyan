@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -23,14 +24,23 @@ var (
 )
 
 func main() {
-	// Get manager URL from environment
-	managerURL = os.Getenv("BANYAN_MANAGER_URL")
+	// Parse command-line arguments
+	portFlag := flag.Int("port", 0, "Port to listen on (default: 8080, or from PROXY_LISTEN_ADDR env)")
+	addrFlag := flag.String("addr", "", "Full address to listen on (e.g., :8080, 127.0.0.1:8080)")
+	flag.Parse()
+
+	// Get manager URL from environment (set by addon manager)
+	managerURL = os.Getenv("BANYAN_MGMT_URL")
 	if managerURL == "" {
-		log.Fatal("BANYAN_MANAGER_URL not set")
+		log.Fatal("BANYAN_MGMT_URL not set")
 	}
 
-	// Allow overriding listen address
-	if addr := os.Getenv("PROXY_LISTEN_ADDR"); addr != "" {
+	// Priority: command-line args > environment variable > default
+	if *addrFlag != "" {
+		listenAddr = *addrFlag
+	} else if *portFlag != 0 {
+		listenAddr = fmt.Sprintf(":%d", *portFlag)
+	} else if addr := os.Getenv("PROXY_LISTEN_ADDR"); addr != "" {
 		listenAddr = addr
 	}
 
@@ -233,6 +243,79 @@ type peerAddressInfo struct {
 // Examples:
 //   - 12D3KooWExample.peer -> peerID=12D3KooWExample, multiaddr=""
 //   - ip4-127_0_0_1-tcp-9000.p2p.12D3KooWExample.peer -> peerID=12D3KooWExample, multiaddr="/ip4/127.0.0.1/tcp/9000"
+//
+// decodePeerID decodes a DNS-safe peer ID back to the original case-sensitive format.
+// Since DNS is case-insensitive and base58 peer IDs are case-sensitive, we use '0'
+// (which is not in base58 alphabet) as an escape character:
+//   - '0' followed by a letter means that letter should be uppercase
+//   - Example: "120d30k0o0o0w..." decodes to "12D3KooW..."
+func decodePeerID(encoded string) string {
+	var result strings.Builder
+	i := 0
+	for i < len(encoded) {
+		if encoded[i] == '0' && i+1 < len(encoded) {
+			nextChar := encoded[i+1]
+			// Check if next char is a letter (should be made uppercase)
+			if (nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z') {
+				result.WriteByte(byte(strings.ToUpper(string(nextChar))[0]))
+				i += 2
+				continue
+			}
+		}
+		result.WriteByte(encoded[i])
+		i++
+	}
+	return result.String()
+}
+
+// resolvePeerAlias resolves a 4-character peer alias to a full peer ID
+// by calling the node's management API
+func resolvePeerAlias(alias string) (string, error) {
+	resp, err := http.Get(managerURL + "/network/connections")
+	if err != nil {
+		return "", fmt.Errorf("failed to get connections: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to get connections: status %d", resp.StatusCode)
+	}
+
+	// Connections is an array, not a map
+	var result struct {
+		Connections []struct {
+			PeerID string `json:"peer_id"`
+			Alias  string `json:"alias"`
+		} `json:"connections"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode connections: %w", err)
+	}
+
+	// Find peer by alias
+	for _, conn := range result.Connections {
+		if strings.EqualFold(conn.Alias, alias) {
+			log.Printf("Resolved alias '%s' to peer ID %s", alias, conn.PeerID)
+			return conn.PeerID, nil
+		}
+	}
+
+	return "", fmt.Errorf("no peer found with alias '%s'", alias)
+}
+
+// isPeerAlias checks if the string looks like a peer alias (4 alphanumeric chars)
+func isPeerAlias(s string) bool {
+	if len(s) != 4 {
+		return false
+	}
+	for _, c := range s {
+		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+			return false
+		}
+	}
+	return true
+}
+
 func parsePeerAddress(host string) peerAddressInfo {
 	// Remove port if present
 	h := host
@@ -250,15 +333,41 @@ func parsePeerAddress(host string) peerAddressInfo {
 		// Decode multiaddr: replace - with /, then _ with .
 		multiaddr := "/" + strings.ReplaceAll(strings.ReplaceAll(multiaddrEncoded, "-", "/"), "_", ".")
 
+		// Check if peer ID is an alias (4 chars) or needs decoding
+		if isPeerAlias(peerID) {
+			if resolved, err := resolvePeerAlias(peerID); err == nil {
+				peerID = resolved
+			}
+		} else {
+			// Decode peer ID (handle DNS case-insensitivity)
+			peerID = decodePeerID(peerID)
+		}
+
 		return peerAddressInfo{
 			PeerID:    peerID,
 			Multiaddr: multiaddr,
 		}
 	}
 
-	// Simple format: just peer ID
+	// Check if it's a peer alias (4 lowercase alphanumeric characters)
+	if isPeerAlias(h) {
+		if resolved, err := resolvePeerAlias(h); err == nil {
+			return peerAddressInfo{
+				PeerID:    resolved,
+				Multiaddr: "",
+			}
+		}
+		// If alias resolution fails, return empty - caller will handle the error
+		log.Printf("Failed to resolve peer alias '%s'", h)
+		return peerAddressInfo{
+			PeerID:    h, // Return as-is, will fail validation later
+			Multiaddr: "",
+		}
+	}
+
+	// Simple format: full peer ID - decode it
 	return peerAddressInfo{
-		PeerID:    h,
+		PeerID:    decodePeerID(h),
 		Multiaddr: "",
 	}
 }
@@ -506,6 +615,23 @@ func checkPeerConnected(peerID string) (bool, error) {
 
 	_, connected := result.Connections[peerID]
 	return connected, nil
+}
+
+// encodePeerIDForDNS encodes a peer ID for use in DNS hostnames.
+// Since DNS is case-insensitive and base58 peer IDs are case-sensitive,
+// we use '0' (not in base58 alphabet) as an escape for uppercase letters.
+// Example: "12D3KooW" -> "120d30k0o0o0w"
+func encodePeerIDForDNS(peerID string) string {
+	var result strings.Builder
+	for _, c := range peerID {
+		if c >= 'A' && c <= 'Z' {
+			result.WriteByte('0')
+			result.WriteRune(c + 32) // Convert to lowercase
+		} else {
+			result.WriteRune(c)
+		}
+	}
+	return result.String()
 }
 
 // connectToPeer attempts to connect to a peer via DHT

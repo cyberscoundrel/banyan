@@ -87,6 +87,7 @@ func (lh *LibP2PHandlers) HandleConnections(w http.ResponseWriter, r *http.Reque
 	for peerID, connItem := range connectionsMap {
 		connInfo := map[string]interface{}{
 			"peer_id":            peerID.String(),
+			"alias":              connItem.Alias,
 			"status":             connItem.Status,
 			"connected":          connItem.Connected,
 			"last_activity":      connItem.LastActivity,
@@ -137,7 +138,7 @@ func (lh *LibP2PHandlers) HandleConnectToPeer(w http.ResponseWriter, r *http.Req
 	}
 
 	// Extract peer ID from path
-	peerIDStr := strings.TrimPrefix(r.URL.Path, "/libp2p/connect-to-peer/")
+	peerIDStr := strings.TrimPrefix(r.URL.Path, "/network/connect/")
 	if peerIDStr == "" {
 		http.Error(w, "Peer ID not specified", http.StatusBadRequest)
 		return
