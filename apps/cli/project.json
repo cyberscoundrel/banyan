@@ -1,0 +1,70 @@
+{
+  "name": "cli",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/cli",
+  "tags": ["type:app", "lang:go"],
+  "namedInputs": {
+    "go": ["{projectRoot}/**/*.go", "{projectRoot}/go.mod", "{projectRoot}/go.sum", "{projectRoot}/tui/banyan.txt"]
+  },
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "inputs": ["go"],
+      "outputs": ["{workspaceRoot}/dist/apps/cli"],
+      "options": {
+        "cwd": "apps/cli",
+        "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/cli"
+      }
+    },
+    "build:production": {
+      "executor": "nx:run-commands",
+      "inputs": ["go"],
+      "outputs": ["{workspaceRoot}/dist/apps/cli"],
+      "options": {
+        "cwd": "apps/cli",
+        "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/cli -Clean"
+      }
+    },
+    "build:unix": {
+      "executor": "nx:run-commands",
+      "inputs": ["go"],
+      "outputs": ["{workspaceRoot}/dist/apps/cli"],
+      "options": {
+        "cwd": "apps/cli",
+        "command": "./build.sh --output ../../dist/apps/cli"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "inputs": ["go"],
+      "options": {
+        "cwd": "apps/cli",
+        "command": "go test ./..."
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "inputs": ["go"],
+      "options": {
+        "cwd": "apps/cli",
+        "command": "go vet ./..."
+      }
+    },
+    "fmt": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/cli",
+        "command": "go fmt ./..."
+      }
+    },
+    "tidy": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/cli",
+        "command": "go mod tidy"
+      }
+    }
+  }
+}
+

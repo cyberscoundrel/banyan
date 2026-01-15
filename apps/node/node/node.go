@@ -24,6 +24,7 @@ import (
 	connectionPkg "banyan/connection"
 	cryptoPkg "banyan/crypto"
 	discoveryPkg "banyan/discovery"
+	eventsPkg "banyan/events"
 	"banyan/interfaces"
 	httpPkg "banyan/libp2p-http"
 	servicePkg "banyan/service"
@@ -270,8 +271,8 @@ func NewNode(ctx context.Context, config *Config, keyLoader PrivateKeyLoader) (*
 		keyLoader:     keyLoader,
 	}
 
-	// Initialize event broadcaster first
-	node.eventBroadcaster = interfaces.EventBroadcaster(nil) // Will be set by the caller
+	// Initialize event broadcaster first - create a real broadcaster for the managers
+	node.eventBroadcaster = eventsPkg.NewBroadcaster(h.ID().String())
 
 	// Initialize managers with interfaces
 	node.connectionManager = connectionPkg.NewManager(h, ctx, httpTransport, kademliaDHT, topic, node.eventBroadcaster)
@@ -450,6 +451,11 @@ func (n *Node) SetHTTPServer(server HTTPServer) {
 // SetEventBroadcaster sets the event broadcaster for the node
 func (n *Node) SetEventBroadcaster(broadcaster interfaces.EventBroadcaster) {
 	n.eventBroadcaster = broadcaster
+}
+
+// GetEventBroadcaster returns the event broadcaster
+func (n *Node) GetEventBroadcaster() interfaces.EventBroadcaster {
+	return n.eventBroadcaster
 }
 
 // GetRouteTable returns the route table
