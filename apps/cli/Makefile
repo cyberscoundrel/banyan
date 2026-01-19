@@ -18,22 +18,22 @@ bin/win bin/linux bin/osx:
 # Windows build
 windows: bin/win
 	GOOS=windows GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -o bin/win/banyan-cli.exe .
-	@echo '{"nodeExecutable": "../../node/win/banyan-node.exe", "webPort": 8080}' > bin/win/banyan-cli.json
+	@echo '{"nodeExecutable": "../../node/win/banyan.exe", "webPort": 8080}' > bin/win/banyan-cli.json
 	@echo "✅ Windows build complete: bin/win/banyan-cli.exe"
 
 # Linux build
 linux: bin/linux
 	GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -o bin/linux/banyan-cli .
-	@echo '{"nodeExecutable": "../../node/linux/banyan-node", "webPort": 8080}' > bin/linux/banyan-cli.json
+	@echo '{"nodeExecutable": "../../node/linux/banyan", "webPort": 8080}' > bin/linux/banyan-cli.json
 	@echo "✅ Linux build complete: bin/linux/banyan-cli"
 
 # macOS builds (both Intel and Apple Silicon)
 macos: bin/osx
 	GOOS=darwin GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -o bin/osx/banyan-cli-amd64 .
-	@echo '{"nodeExecutable": "../../node/osx/banyan-node-amd64", "webPort": 8080}' > bin/osx/banyan-cli.json
+	@echo '{"nodeExecutable": "../../node/osx/banyan-amd64", "webPort": 8080}' > bin/osx/banyan-cli-amd64.json
 	@echo "✅ macOS Intel build complete: bin/osx/banyan-cli-amd64"
 	GOOS=darwin GOARCH=arm64 go build -ldflags="$(LDFLAGS)" -o bin/osx/banyan-cli-arm64 .
-	@echo '{"nodeExecutable": "../../node/osx/banyan-node-arm64", "webPort": 8080}' > bin/osx/banyan-cli-arm64.json
+	@echo '{"nodeExecutable": "../../node/osx/banyan-arm64", "webPort": 8080}' > bin/osx/banyan-cli-arm64.json
 	@echo "✅ macOS Apple Silicon build complete: bin/osx/banyan-cli-arm64"
 
 # Clean build artifacts

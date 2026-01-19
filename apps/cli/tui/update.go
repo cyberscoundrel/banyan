@@ -441,6 +441,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c", "ctrl+q":
+		// Mark TUI as inactive so web handlers know not to wait
+		session.Get().SetTUIActive(false)
 		// Save instances before exiting
 		m.SaveInstancesToConfig()
 		// Kill all subprocess instances

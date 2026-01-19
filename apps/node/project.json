@@ -14,16 +14,42 @@
       "outputs": ["{workspaceRoot}/dist/apps/node"],
       "options": {
         "cwd": "apps/node",
-        "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/node"
-      }
-    },
-    "build:production": {
-      "executor": "nx:run-commands",
-      "inputs": ["go"],
-      "outputs": ["{workspaceRoot}/dist/apps/node"],
-      "options": {
-        "cwd": "apps/node",
-        "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/node -Clean"
+        "commands": [
+          {
+            "command": "./build.sh --output ../../dist/apps/node",
+            "forwardAllArgs": false,
+            "description": "Build for Unix (Linux/macOS)"
+          }
+        ]
+      },
+      "configurations": {
+        "windows": {
+          "commands": [
+            {
+              "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/node",
+              "forwardAllArgs": false,
+              "description": "Build for Windows"
+            }
+          ]
+        },
+        "production": {
+          "commands": [
+            {
+              "command": "./build.sh --output ../../dist/apps/node --clean",
+              "forwardAllArgs": false,
+              "description": "Production build for Unix (Linux/macOS)"
+            }
+          ]
+        },
+        "production-windows": {
+          "commands": [
+            {
+              "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/node -Clean",
+              "forwardAllArgs": false,
+              "description": "Production build for Windows"
+            }
+          ]
+        }
       }
     },
     "test": {
