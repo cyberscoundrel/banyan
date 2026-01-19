@@ -162,6 +162,11 @@ func handleHTTPConnect(conn net.Conn, req *http.Request) {
 		}
 		defer target.Close()
 
+		if _, err := conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n")); err != nil {
+			return
+		}
+		defer target.Close()
+
 		conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 		relay(conn, target)
 	}
@@ -607,14 +612,21 @@ func checkPeerConnected(peerID string) (bool, error) {
 	}
 
 	var result struct {
-		Connections map[string]interface{} `json:"connections"`
+		Connections []struct {
+			PeerID string `json:"peer_id"`
+		} `json:"connections"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return false, nil // Assume not connected if we can't parse
+		return false, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	_, connected := result.Connections[peerID]
-	return connected, nil
+	for _, conn := range result.Connections {
+		if conn.PeerID == peerID {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // encodePeerIDForDNS encodes a peer ID for use in DNS hostnames.
@@ -817,6 +829,10 @@ func handleSOCKS5Direct(conn net.Conn, host string, port uint16) {
 
 	// Success reply
 	localAddr := target.LocalAddr().(*net.TCPAddr)
+	if localAddr == nil {
+		conn.Write([]byte{0x05, 0x01, 0x00, 0x01, 0, 0, 0, 0, 0, 0}) // General failure
+		return
+	}
 	reply := []byte{0x05, 0x00, 0x00, 0x01}
 	reply = append(reply, localAddr.IP.To4()...)
 	reply = append(reply, byte(localAddr.Port>>8), byte(localAddr.Port&0xff))

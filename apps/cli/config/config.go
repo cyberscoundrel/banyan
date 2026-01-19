@@ -111,6 +111,7 @@ func (c *Config) SaveInstances(instances []SavedInstance, activeIndex int) error
 }
 
 // AddLoggedInstance adds an instance to the logged instances list if not already present
+// It automatically persists the change to the configuration file
 func (c *Config) AddLoggedInstance(address, name string) {
 	now := time.Now().Format(time.RFC3339)
 	// Check if already exists
@@ -121,6 +122,8 @@ func (c *Config) AddLoggedInstance(address, name string) {
 			if name != "" && inst.Name != name {
 				c.LoggedInstances[i].Name = name
 			}
+			// Auto-save after modification
+			c.SaveLoggedInstances()
 			return
 		}
 	}
@@ -131,21 +134,29 @@ func (c *Config) AddLoggedInstance(address, name string) {
 		CreatedAt: now,
 		LastSeen:  now,
 	})
+	// Auto-save after modification
+	c.SaveLoggedInstances()
 }
 
 // RemoveLoggedInstance removes an instance from the logged instances list by index (1-based)
+// It automatically persists the change to the configuration file
 func (c *Config) RemoveLoggedInstance(index int) bool {
 	idx := index - 1 // Convert to 0-based
 	if idx < 0 || idx >= len(c.LoggedInstances) {
 		return false
 	}
 	c.LoggedInstances = append(c.LoggedInstances[:idx], c.LoggedInstances[idx+1:]...)
+	// Auto-save after modification
+	c.SaveLoggedInstances()
 	return true
 }
 
 // ClearLoggedInstances removes all logged instances
+// It automatically persists the change to the configuration file
 func (c *Config) ClearLoggedInstances() {
 	c.LoggedInstances = nil
+	// Auto-save after modification
+	c.SaveLoggedInstances()
 }
 
 // GetLoggedInstances returns a copy of the logged instances list

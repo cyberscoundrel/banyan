@@ -16,6 +16,24 @@ Write-Host ""
 Write-Host "Building Banyan CLI for all platforms..." -ForegroundColor Green
 Write-Host ""
 
+# Copy web dist files for embedding
+$WebDistSource = "../web/dist"
+$WebDistDest = "server/web/dist"
+
+if (Test-Path $WebDistSource) {
+    Write-Host "Copying web dist files for embedding..." -ForegroundColor Cyan
+    if (Test-Path $WebDistDest) {
+        Remove-Item -Recurse -Force $WebDistDest
+    }
+    New-Item -ItemType Directory -Force -Path "server/web" | Out-Null
+    Copy-Item -Recurse $WebDistSource $WebDistDest
+    Write-Host "Web dist files copied!" -ForegroundColor Green
+} else {
+    Write-Host "Warning: Web dist not found at $WebDistSource" -ForegroundColor Yellow
+    Write-Host "Run 'nx build web' first to build the web UI" -ForegroundColor Yellow
+    exit 1
+}
+
 $GitCommit = "dev"
 try {
     $GitCommit = (git describe --tags --always --dirty 2>$null)
@@ -80,7 +98,7 @@ if ($LASTEXITCODE -eq 0) {
         nodeExecutable = "../../node/osx/banyan-amd64"
         webPort = 8080
     } | ConvertTo-Json
-    Set-Content -Path "$OutputDir/osx/banyan-cli.json" -Value $configOsx
+    Set-Content -Path "$OutputDir/osx/banyan-cli-amd64.json" -Value $configOsx
 } else {
     Write-Host "macOS Intel build failed!" -ForegroundColor Red
     exit 1

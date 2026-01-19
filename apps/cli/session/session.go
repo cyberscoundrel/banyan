@@ -4,6 +4,7 @@ package session
 import (
 	"encoding/json"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -64,6 +65,10 @@ type Session struct {
 	// Command channel for WebUI -> TUI commands
 	cmdChan    chan Command
 	resultChan chan CommandResult
+
+	// Track if TUI is actively listening
+	tuiActive   bool
+	tuiActiveMu sync.RWMutex
 }
 
 // Global session instance
@@ -84,10 +89,42 @@ func Get() *Session {
 	return globalSession
 }
 
-// SendCommand sends a command to the TUI and waits for result
+// SendCommand sends a command to the TUI and waits for result with timeout
+// Returns an error result if TUI is not active or times out
 func (s *Session) SendCommand(cmd Command) CommandResult {
-	s.cmdChan <- cmd
-	return <-s.resultChan
+	// Check if TUI is active
+	s.tuiActiveMu.RLock()
+	active := s.tuiActive
+	s.tuiActiveMu.RUnlock()
+
+	if !active {
+		return CommandResult{
+			Success: false,
+			Message: "TUI is not running; command cannot be processed in web-only mode",
+		}
+	}
+
+	// Try to send command with timeout
+	select {
+	case s.cmdChan <- cmd:
+		// Command sent, now wait for result with timeout
+	case <-time.After(5 * time.Second):
+		return CommandResult{
+			Success: false,
+			Message: "timeout sending command to TUI",
+		}
+	}
+
+	// Wait for result with timeout
+	select {
+	case result := <-s.resultChan:
+		return result
+	case <-time.After(30 * time.Second):
+		return CommandResult{
+			Success: false,
+			Message: "timeout waiting for TUI response",
+		}
+	}
 }
 
 // CommandChan returns the command channel for TUI to listen on
@@ -98,6 +135,20 @@ func (s *Session) CommandChan() <-chan Command {
 // SendResult sends a command result back to the WebUI handler
 func (s *Session) SendResult(result CommandResult) {
 	s.resultChan <- result
+}
+
+// SetTUIActive sets whether the TUI is actively listening for commands
+func (s *Session) SetTUIActive(active bool) {
+	s.tuiActiveMu.Lock()
+	s.tuiActive = active
+	s.tuiActiveMu.Unlock()
+}
+
+// IsTUIActive returns whether the TUI is actively listening for commands
+func (s *Session) IsTUIActive() bool {
+	s.tuiActiveMu.RLock()
+	defer s.tuiActiveMu.RUnlock()
+	return s.tuiActive
 }
 
 // UpdateInstances updates the instance state and broadcasts to all WebUI clients

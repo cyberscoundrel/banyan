@@ -198,7 +198,11 @@ func (s *Server) handleServeStop(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ServiceKeyHash string `json:"serviceKeyHash"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid request body: " + err.Error()})
+		return
+	}
 
 	if err := c.StopServiceBeacon(req.ServiceKeyHash); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

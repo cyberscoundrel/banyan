@@ -13,7 +13,7 @@ concurrency:
 jobs:
   main:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,11 +29,15 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
           cache: true
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Make shell scripts executable
+        run: |
+          find . -name "*.sh" -type f -exec chmod +x {} \;
 
       - name: Set Nx SHAs
         uses: nrwl/nx-set-shas@v4
