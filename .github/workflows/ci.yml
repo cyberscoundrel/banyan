@@ -29,7 +29,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version-file: 'go.work'
           cache: true
 
       - name: Install dependencies
@@ -43,11 +43,11 @@ jobs:
         uses: nrwl/nx-set-shas@v4
 
       - name: Run affected lint
-        run: npx nx affected -t lint --parallel=3
+        run: npx nx affected -t lint --parallel=3 --verbose
 
       - name: Run affected test
-        run: npx nx affected -t test --parallel=3
+        run: npx nx affected -t test --parallel=3 --verbose
 
       - name: Run affected build
-        run: npx nx affected -t build --parallel=3
+        run: npx nx affected -t build --parallel=3 --verbose
 
