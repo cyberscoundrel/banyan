@@ -39,6 +39,16 @@ jobs:
         run: |
           find . -name "*.sh" -type f -exec chmod +x {} \;
 
+      - name: Download Go dependencies
+        run: |
+          go work sync
+          for dir in apps/node apps/cli apps/topology-gen packages/addon-sdk packages/transports/i2p packages/transports/nym; do
+            if [ -f "$dir/go.mod" ]; then
+              echo "Downloading dependencies for $dir"
+              (cd "$dir" && go mod download)
+            fi
+          done
+
       - name: Set Nx SHAs
         uses: nrwl/nx-set-shas@v4
 
