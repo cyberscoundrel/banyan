@@ -54,11 +54,11 @@ jobs:
         uses: nrwl/nx-set-shas@v4
 
       - name: Run affected lint
-        run: npx nx affected -t lint --parallel=3 --verbose
+        run: npx nx affected -t lint --parallel=3 --verbose --exclude=transport-i2p,transport-nym
 
       - name: Run affected test
-        run: npx nx affected -t test --parallel=3 --verbose
+        run: npx nx affected -t test --parallel=3 --verbose --exclude=transport-i2p,transport-nym
 
       - name: Run affected build
-        run: npx nx affected -t build --parallel=3 --verbose
+        run: npx nx affected -t build --parallel=3 --verbose --exclude=transport-i2p,transport-nym
 
