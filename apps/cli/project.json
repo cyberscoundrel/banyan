@@ -63,10 +63,22 @@
     },
     "lint": {
       "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
       "inputs": ["go"],
       "options": {
         "cwd": "apps/cli",
-        "command": "go vet ./..."
+        "commands": [
+          "mkdir -p server/web/dist && cp -r ../web/dist/* server/web/dist/ 2>/dev/null || true",
+          "go vet ./..."
+        ]
+      },
+      "configurations": {
+        "windows": {
+          "commands": [
+            "if (!(Test-Path server/web/dist)) { New-Item -ItemType Directory -Force -Path server/web/dist | Out-Null }; if (Test-Path ../web/dist) { Copy-Item -Recurse -Force ../web/dist/* server/web/dist/ }",
+            "go vet ./..."
+          ]
+        }
       }
     },
     "fmt": {
