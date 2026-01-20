@@ -242,10 +242,14 @@ func (s *Server) executeCommand(input string) (string, error) {
 				s.activeInstanceIdx = len(s.instances) - 1
 			}
 			s.instancesMu.Unlock()
+			// Sync to session after modification
+			s.SyncToSession()
 			return fmt.Sprintf("Removed disconnected instance %d", n), nil
 		}
 		s.activeInstanceIdx = idx
 		s.instancesMu.Unlock()
+		// Sync to session after modification
+		s.SyncToSession()
 		return fmt.Sprintf("Switched to instance %d: %s", n, inst.Address), nil
 
 	case "instances":

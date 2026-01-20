@@ -9,9 +9,8 @@ banyan-cli
 # Config files (should be created by user)
 banyan-cli.json
 
-# Web build output (should be built by user)
-server/web/dist/
-!server/web/dist/index.html
+# Web build output (copied from apps/web/dist during build)
+server/web/
 
 # Web dependencies
 server/web/node_modules/

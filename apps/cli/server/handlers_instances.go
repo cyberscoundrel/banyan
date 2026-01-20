@@ -25,7 +25,7 @@ func (s *Server) handleInstances(w http.ResponseWriter, r *http.Request) {
 	sessInstances := sess.GetInstances()
 
 	instances := make([]InstanceInfo, 0, len(sessInstances))
-	activeIdx := 0
+	activeIdx := -1 // -1 indicates no active instance
 	for _, inst := range sessInstances {
 		instances = append(instances, InstanceInfo{
 			Index:      inst.Index,
@@ -96,7 +96,11 @@ func (s *Server) handleStopInstance(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Index int `json:"index"` // 1-based, 0 means active
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid request body: " + err.Error()})
+		return
+	}
 
 	// Send command to TUI via session
 	sess := session.Get()
