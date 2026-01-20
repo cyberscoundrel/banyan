@@ -14,41 +14,17 @@
       "outputs": ["{workspaceRoot}/dist/apps/node"],
       "options": {
         "cwd": "apps/node",
-        "commands": [
-          {
-            "command": "./build.sh --output ../../dist/apps/node",
-            "forwardAllArgs": false,
-            "description": "Build for Unix (Linux/macOS)"
-          }
-        ]
+        "command": "./build.sh --output ../../dist/apps/node"
       },
       "configurations": {
         "windows": {
-          "commands": [
-            {
-              "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/node",
-              "forwardAllArgs": false,
-              "description": "Build for Windows"
-            }
-          ]
+          "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/node"
         },
         "production": {
-          "commands": [
-            {
-              "command": "./build.sh --output ../../dist/apps/node --clean",
-              "forwardAllArgs": false,
-              "description": "Production build for Unix (Linux/macOS)"
-            }
-          ]
+          "command": "./build.sh --output ../../dist/apps/node --clean"
         },
         "production-windows": {
-          "commands": [
-            {
-              "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/node -Clean",
-              "forwardAllArgs": false,
-              "description": "Production build for Windows"
-            }
-          ]
+          "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/node -Clean"
         }
       }
     },
