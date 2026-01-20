@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for nx affected commands
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.work'
+          cache: true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Make shell scripts executable
+        run: |
+          find . -name "*.sh" -type f -exec chmod +x {} \;
+
+      - name: Download Go dependencies
+        run: |
+          go work sync
+          for dir in apps/node apps/cli apps/topology-gen packages/addon-sdk packages/transports/i2p packages/transports/nym; do
+            if [ -f "$dir/go.mod" ]; then
+              echo "Downloading dependencies for $dir"
+              (cd "$dir" && go mod download)
+            fi
+          done
+
+      - name: Set Nx SHAs
+        uses: nrwl/nx-set-shas@v4
+
+      - name: Run affected lint
+        run: npx nx affected -t lint --parallel=3 --verbose --exclude=transport-i2p,transport-nym
+
+      - name: Run affected test
+        run: npx nx affected -t test --parallel=3 --verbose --exclude=transport-i2p,transport-nym
+
+      - name: Run affected build
+        run: npx nx affected -t build --parallel=3 --verbose --exclude=transport-i2p,transport-nym
+

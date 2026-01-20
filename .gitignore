@@ -26,6 +26,10 @@ __debug_bin*
 # IDE files
 .vscode/
 .idea/
+.cursor/
+
+# Nx cache
+.nx/
 
 # OS files
 .DS_Store

@@ -28,6 +28,7 @@ import (
 	"banyan/interfaces"
 	httpPkg "banyan/libp2p-http"
 	servicePkg "banyan/service"
+	tunnelPkg "banyan/tunnel"
 	"banyan/types"
 )
 
@@ -59,6 +60,10 @@ type Config struct {
 	BeaconPeerIDDirectOnly           *bool
 	// Transport restriction flags
 	OverrideTransportRestrictions *bool // Allow connections even if transport doesn't match fig restrictions
+	// Tunnel configuration
+	TunnelEnabled        *bool    // Enable TCP tunnel protocol handler
+	TunnelAuthToken      *string  // Auth token required for tunnel API (optional)
+	TunnelAllowedTargets []string // Allowed target hosts for outbound tunnels (default: localhost only)
 }
 
 // Node represents our libp2p node with HTTP proxy capabilities
@@ -80,6 +85,7 @@ type Node struct {
 	discoveryManager  interfaces.DiscoveryManager
 	serviceManager    interfaces.ServiceManager
 	httpHandler       interfaces.HTTPHandler
+	tunnelHandler     *tunnelPkg.Handler
 
 	// Service-specific components
 	serviceBeacon interfaces.ServiceBeacon // legacy single beacon (first)
@@ -290,6 +296,18 @@ func NewNode(ctx context.Context, config *Config, keyLoader PrivateKeyLoader) (*
 	// Create HTTP handler
 	node.httpHandler = httpPkg.NewHandler(h, ctx, httpTransport, node.connectionManager, node.serviceManager, node.cryptoManager, node.eventBroadcaster, routeTable, noCrypto)
 
+	// Create TCP tunnel handler for peer-to-peer TCP tunneling (if enabled)
+	tunnelEnabled := config.TunnelEnabled == nil || *config.TunnelEnabled
+	if tunnelEnabled {
+		node.tunnelHandler = tunnelPkg.NewHandler(h, ctx, func(format string, v ...interface{}) {
+			fmt.Printf("[tunnel] "+format+"\n", v...)
+		})
+		// Set allowed targets from config
+		if len(config.TunnelAllowedTargets) > 0 {
+			node.tunnelHandler.SetAllowedTargets(config.TunnelAllowedTargets)
+		}
+	}
+
 	// Multi-service beacons will be loaded in Start() via services loader
 
 	// Set up connection handlers
@@ -448,6 +466,11 @@ func (n *Node) GetRouteTable() *types.RouteTable {
 // GetConfig returns the node configuration
 func (n *Node) GetConfig() *Config {
 	return n.config
+}
+
+// GetTunnelHandler returns the TCP tunnel handler
+func (n *Node) GetTunnelHandler() *tunnelPkg.Handler {
+	return n.tunnelHandler
 }
 
 // loadAndStartServices loads services.json from the services directory and starts service beacons

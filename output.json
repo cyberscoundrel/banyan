@@ -1,0 +1,897 @@
+{
+  "graph": {
+    "nodes": {
+      "transport-i2p": {
+        "name": "transport-i2p",
+        "type": "lib",
+        "data": {
+          "root": "packages/transports/i2p",
+          "name": "transport-i2p",
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "projectType": "library",
+          "sourceRoot": "packages/transports/i2p",
+          "tags": [
+            "type:lib",
+            "lang:go",
+            "transport"
+          ],
+          "namedInputs": {
+            "go": [
+              "{projectRoot}/**/*.go",
+              "{projectRoot}/go.mod",
+              "{projectRoot}/go.sum"
+            ]
+          },
+          "targets": {
+            "build": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "packages/transports/i2p",
+                "command": "go build ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "cache": true
+            },
+            "test": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "packages/transports/i2p",
+                "command": "go test ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "build"
+              ],
+              "cache": true
+            },
+            "lint": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "packages/transports/i2p",
+                "command": "go vet ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true
+            },
+            "tidy": {
+              "executor": "nx:run-commands",
+              "options": {
+                "cwd": "packages/transports/i2p",
+                "command": "go mod tidy"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "implicitDependencies": []
+        }
+      },
+      "transport-nym": {
+        "name": "transport-nym",
+        "type": "lib",
+        "data": {
+          "root": "packages/transports/nym",
+          "name": "transport-nym",
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "projectType": "library",
+          "sourceRoot": "packages/transports/nym",
+          "tags": [
+            "type:lib",
+            "lang:go",
+            "transport"
+          ],
+          "namedInputs": {
+            "go": [
+              "{projectRoot}/**/*.go",
+              "{projectRoot}/go.mod",
+              "{projectRoot}/go.sum"
+            ]
+          },
+          "targets": {
+            "build": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "packages/transports/nym",
+                "command": "go build ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "cache": true
+            },
+            "test": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "packages/transports/nym",
+                "command": "go test ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "build"
+              ],
+              "cache": true
+            },
+            "lint": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "packages/transports/nym",
+                "command": "go vet ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true
+            },
+            "tidy": {
+              "executor": "nx:run-commands",
+              "options": {
+                "cwd": "packages/transports/nym",
+                "command": "go mod tidy"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "implicitDependencies": []
+        }
+      },
+      "proxy-addon": {
+        "name": "proxy-addon",
+        "type": "app",
+        "data": {
+          "root": "apps/node/addon/proxy",
+          "name": "proxy-addon",
+          "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+          "projectType": "application",
+          "sourceRoot": "apps/node/addon/proxy",
+          "tags": [
+            "type:addon",
+            "lang:go"
+          ],
+          "implicitDependencies": [
+            "node"
+          ],
+          "namedInputs": {
+            "go": [
+              "{projectRoot}/**/*.go",
+              "{projectRoot}/go.mod",
+              "{projectRoot}/go.sum"
+            ],
+            "proxy-src": [
+              "{projectRoot}/**/*.go"
+            ]
+          },
+          "targets": {
+            "build": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "proxy-src"
+              ],
+              "outputs": [
+                "{workspaceRoot}/dist/addons"
+              ],
+              "options": {
+                "command": "go build -o dist/addons/proxy-addon ./apps/node/addon/proxy",
+                "cwd": ""
+              },
+              "configurations": {
+                "windows": {
+                  "command": "go build -o dist/addons/proxy-addon.exe ./apps/node/addon/proxy"
+                },
+                "debug-linux": {
+                  "command": "GOOS=linux GOARCH=amd64 go build -o dist/apps/node/debug/linux/addons/proxy-addon ./apps/node/addon/proxy"
+                },
+                "debug-osx": {
+                  "command": "GOOS=darwin GOARCH=amd64 go build -o dist/apps/node/debug/osx/addons/proxy-addon ./apps/node/addon/proxy"
+                },
+                "release-linux": {
+                  "command": "GOOS=linux GOARCH=amd64 go build -ldflags=\"-s -w\" -o dist/addons/linux/proxy-addon ./apps/node/addon/proxy"
+                },
+                "release-osx-amd64": {
+                  "command": "GOOS=darwin GOARCH=amd64 go build -ldflags=\"-s -w\" -o dist/addons/osx/proxy-addon-amd64 ./apps/node/addon/proxy"
+                },
+                "release-osx-arm64": {
+                  "command": "GOOS=darwin GOARCH=arm64 go build -ldflags=\"-s -w\" -o dist/addons/osx/proxy-addon-arm64 ./apps/node/addon/proxy"
+                }
+              },
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "cache": true
+            },
+            "build:all-platforms": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "proxy-src"
+              ],
+              "outputs": [
+                "{workspaceRoot}/dist/addons"
+              ],
+              "options": {
+                "commands": [
+                  "GOOS=windows GOARCH=amd64 go build -o dist/addons/win/proxy-addon.exe ./apps/node/addon/proxy",
+                  "GOOS=linux GOARCH=amd64 go build -o dist/addons/linux/proxy-addon ./apps/node/addon/proxy",
+                  "GOOS=darwin GOARCH=amd64 go build -o dist/addons/osx/proxy-addon-amd64 ./apps/node/addon/proxy",
+                  "GOOS=darwin GOARCH=arm64 go build -o dist/addons/osx/proxy-addon-arm64 ./apps/node/addon/proxy"
+                ],
+                "cwd": "",
+                "parallel": false
+              },
+              "configurations": {
+                "windows": {
+                  "commands": [
+                    "powershell -Command \"$env:GOOS='windows'; $env:GOARCH='amd64'; go build -o dist/addons/win/proxy-addon.exe ./apps/node/addon/proxy\"",
+                    "powershell -Command \"$env:GOOS='linux'; $env:GOARCH='amd64'; go build -o dist/addons/linux/proxy-addon ./apps/node/addon/proxy\"",
+                    "powershell -Command \"$env:GOOS='darwin'; $env:GOARCH='amd64'; go build -o dist/addons/osx/proxy-addon-amd64 ./apps/node/addon/proxy\"",
+                    "powershell -Command \"$env:GOOS='darwin'; $env:GOARCH='arm64'; go build -o dist/addons/osx/proxy-addon-arm64 ./apps/node/addon/proxy\""
+                  ]
+                },
+                "release": {
+                  "commands": [
+                    "GOOS=windows GOARCH=amd64 go build -ldflags=\"-s -w\" -o dist/addons/win/proxy-addon.exe ./apps/node/addon/proxy",
+                    "GOOS=linux GOARCH=amd64 go build -ldflags=\"-s -w\" -o dist/addons/linux/proxy-addon ./apps/node/addon/proxy",
+                    "GOOS=darwin GOARCH=amd64 go build -ldflags=\"-s -w\" -o dist/addons/osx/proxy-addon-amd64 ./apps/node/addon/proxy",
+                    "GOOS=darwin GOARCH=arm64 go build -ldflags=\"-s -w\" -o dist/addons/osx/proxy-addon-arm64 ./apps/node/addon/proxy"
+                  ]
+                },
+                "release-windows": {
+                  "commands": [
+                    "powershell -Command \"$env:GOOS='windows'; $env:GOARCH='amd64'; go build -ldflags='-s -w' -o dist/addons/win/proxy-addon.exe ./apps/node/addon/proxy\"",
+                    "powershell -Command \"$env:GOOS='linux'; $env:GOARCH='amd64'; go build -ldflags='-s -w' -o dist/addons/linux/proxy-addon ./apps/node/addon/proxy\"",
+                    "powershell -Command \"$env:GOOS='darwin'; $env:GOARCH='amd64'; go build -ldflags='-s -w' -o dist/addons/osx/proxy-addon-amd64 ./apps/node/addon/proxy\"",
+                    "powershell -Command \"$env:GOOS='darwin'; $env:GOARCH='arm64'; go build -ldflags='-s -w' -o dist/addons/osx/proxy-addon-arm64 ./apps/node/addon/proxy\""
+                  ]
+                }
+              },
+              "parallelism": true
+            },
+            "test": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "proxy-src"
+              ],
+              "options": {
+                "cwd": "apps/node/addon/proxy",
+                "command": "go test ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "build"
+              ],
+              "cache": true
+            },
+            "test:integration": {
+              "executor": "nx:run-commands",
+              "dependsOn": [
+                "node:build",
+                "build"
+              ],
+              "inputs": [
+                "proxy-src",
+                "{projectRoot}/test-proxy-nodes.sh",
+                "{projectRoot}/test-proxy-nodes.ps1"
+              ],
+              "options": {
+                "cwd": "apps/node/addon/proxy",
+                "command": "./test-proxy-nodes.sh"
+              },
+              "configurations": {
+                "windows": {
+                  "command": "powershell -ExecutionPolicy Bypass -File test-proxy-nodes.ps1"
+                }
+              },
+              "parallelism": true
+            },
+            "lint": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "proxy-src"
+              ],
+              "options": {
+                "cwd": "apps/node/addon/proxy",
+                "command": "go vet ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true
+            }
+          }
+        }
+      },
+      "addon-sdk": {
+        "name": "addon-sdk",
+        "type": "lib",
+        "data": {
+          "root": "packages/addon-sdk",
+          "name": "addon-sdk",
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "projectType": "library",
+          "sourceRoot": "packages/addon-sdk",
+          "tags": [
+            "type:lib",
+            "lang:go"
+          ],
+          "namedInputs": {
+            "go": [
+              "{projectRoot}/**/*.go",
+              "{projectRoot}/go.mod"
+            ]
+          },
+          "targets": {
+            "build": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "packages/addon-sdk",
+                "command": "go build ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "cache": true
+            },
+            "test": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "packages/addon-sdk",
+                "command": "go test ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "build"
+              ],
+              "cache": true
+            },
+            "lint": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "packages/addon-sdk",
+                "command": "go vet ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true
+            },
+            "tidy": {
+              "executor": "nx:run-commands",
+              "options": {
+                "cwd": "packages/addon-sdk",
+                "command": "go mod tidy"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "implicitDependencies": []
+        }
+      },
+      "topology-gen": {
+        "name": "topology-gen",
+        "type": "app",
+        "data": {
+          "root": "apps/topology-gen",
+          "name": "topology-gen",
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "projectType": "application",
+          "sourceRoot": "apps/topology-gen",
+          "tags": [
+            "type:app",
+            "lang:go"
+          ],
+          "implicitDependencies": [
+            "node"
+          ],
+          "namedInputs": {
+            "go": [
+              "{projectRoot}/**/*.go",
+              "{projectRoot}/go.mod",
+              "{projectRoot}/go.sum"
+            ]
+          },
+          "targets": {
+            "build": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "outputs": [
+                "{workspaceRoot}/dist/apps/topology-gen"
+              ],
+              "options": {
+                "cwd": "apps/topology-gen",
+                "command": "go build -o ../../dist/apps/topology-gen/generator generator.go"
+              },
+              "configurations": {
+                "windows": {
+                  "command": "go build -o ../../dist/apps/topology-gen/generator.exe generator.go"
+                },
+                "production": {
+                  "command": "go build -ldflags=\"-s -w\" -o ../../dist/apps/topology-gen/generator generator.go"
+                },
+                "production-windows": {
+                  "command": "go build -ldflags=\"-s -w\" -o ../../dist/apps/topology-gen/generator.exe generator.go"
+                }
+              },
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "cache": true
+            },
+            "create-topology": {
+              "executor": "nx:run-commands",
+              "dependsOn": [
+                "build",
+                "node:build"
+              ],
+              "inputs": [
+                "{projectRoot}/**/*.json",
+                "!{projectRoot}/project.json"
+              ],
+              "outputs": [
+                "{workspaceRoot}/dist/topology/{args.name}"
+              ],
+              "options": {
+                "cwd": "",
+                "command": "./dist/apps/topology-gen/generator apps/topology-gen/{args.config} dist/topology/{args.name} --banyan-path=../../../../apps/node"
+              },
+              "configurations": {
+                "windows": {
+                  "command": "powershell -Command \"& .\\dist\\apps\\topology-gen\\generator.exe apps\\topology-gen\\{args.config} dist\\topology\\{args.name} --banyan-path=../../../../apps/node\""
+                }
+              },
+              "parallelism": true
+            },
+            "test": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "apps/topology-gen",
+                "command": "go test ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "build"
+              ],
+              "cache": true
+            },
+            "lint": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "apps/topology-gen",
+                "command": "go vet ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true
+            },
+            "tidy": {
+              "executor": "nx:run-commands",
+              "options": {
+                "cwd": "apps/topology-gen",
+                "command": "go mod tidy"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          }
+        }
+      },
+      "node": {
+        "name": "node",
+        "type": "app",
+        "data": {
+          "root": "apps/node",
+          "name": "node",
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "projectType": "application",
+          "sourceRoot": "apps/node",
+          "tags": [
+            "type:app",
+            "lang:go"
+          ],
+          "namedInputs": {
+            "go": [
+              "{projectRoot}/**/*.go",
+              "{projectRoot}/go.mod",
+              "{projectRoot}/go.sum"
+            ]
+          },
+          "targets": {
+            "build": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "outputs": [
+                "{workspaceRoot}/dist/apps/node"
+              ],
+              "options": {
+                "cwd": "apps/node",
+                "commands": [
+                  {
+                    "command": "./build.sh --output ../../dist/apps/node",
+                    "forwardAllArgs": false,
+                    "description": "Build for Unix (Linux/macOS)"
+                  }
+                ]
+              },
+              "configurations": {
+                "windows": {
+                  "commands": [
+                    {
+                      "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/node",
+                      "forwardAllArgs": false,
+                      "description": "Build for Windows"
+                    }
+                  ]
+                },
+                "production": {
+                  "commands": [
+                    {
+                      "command": "./build.sh --output ../../dist/apps/node --clean",
+                      "forwardAllArgs": false,
+                      "description": "Production build for Unix (Linux/macOS)"
+                    }
+                  ]
+                },
+                "production-windows": {
+                  "commands": [
+                    {
+                      "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/node -Clean",
+                      "forwardAllArgs": false,
+                      "description": "Production build for Windows"
+                    }
+                  ]
+                }
+              },
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "cache": true
+            },
+            "test": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "apps/node",
+                "command": "go test ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "build"
+              ],
+              "cache": true
+            },
+            "lint": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "apps/node",
+                "command": "go vet ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true
+            },
+            "fmt": {
+              "executor": "nx:run-commands",
+              "options": {
+                "cwd": "apps/node",
+                "command": "go fmt ./..."
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "tidy": {
+              "executor": "nx:run-commands",
+              "options": {
+                "cwd": "apps/node",
+                "command": "go mod tidy"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "implicitDependencies": []
+        }
+      },
+      "cli": {
+        "name": "cli",
+        "type": "app",
+        "data": {
+          "root": "apps/cli",
+          "name": "cli",
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "projectType": "application",
+          "sourceRoot": "apps/cli",
+          "tags": [
+            "type:app",
+            "lang:go"
+          ],
+          "namedInputs": {
+            "go": [
+              "{projectRoot}/**/*.go",
+              "{projectRoot}/go.mod",
+              "{projectRoot}/go.sum",
+              "{projectRoot}/tui/banyan.txt"
+            ]
+          },
+          "targets": {
+            "build": {
+              "executor": "nx:run-commands",
+              "dependsOn": [
+                "web:build"
+              ],
+              "inputs": [
+                "go",
+                "{workspaceRoot}/apps/web/dist/**/*"
+              ],
+              "outputs": [
+                "{workspaceRoot}/dist/apps/cli"
+              ],
+              "options": {
+                "cwd": "apps/cli",
+                "commands": [
+                  {
+                    "command": "./build.sh --output ../../dist/apps/cli",
+                    "forwardAllArgs": false,
+                    "description": "Build for Unix (Linux/macOS)"
+                  }
+                ]
+              },
+              "configurations": {
+                "windows": {
+                  "commands": [
+                    {
+                      "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/cli",
+                      "forwardAllArgs": false,
+                      "description": "Build for Windows"
+                    }
+                  ]
+                },
+                "production": {
+                  "commands": [
+                    {
+                      "command": "./build.sh --output ../../dist/apps/cli --clean",
+                      "forwardAllArgs": false,
+                      "description": "Production build for Unix (Linux/macOS)"
+                    }
+                  ]
+                },
+                "production-windows": {
+                  "commands": [
+                    {
+                      "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/cli -Clean",
+                      "forwardAllArgs": false,
+                      "description": "Production build for Windows"
+                    }
+                  ]
+                }
+              },
+              "parallelism": true,
+              "cache": true
+            },
+            "test": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "apps/cli",
+                "command": "go test ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "build"
+              ],
+              "cache": true
+            },
+            "lint": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "go"
+              ],
+              "options": {
+                "cwd": "apps/cli",
+                "command": "go vet ./..."
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true
+            },
+            "fmt": {
+              "executor": "nx:run-commands",
+              "options": {
+                "cwd": "apps/cli",
+                "command": "go fmt ./..."
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "tidy": {
+              "executor": "nx:run-commands",
+              "options": {
+                "cwd": "apps/cli",
+                "command": "go mod tidy"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "implicitDependencies": []
+        }
+      },
+      "web": {
+        "name": "web",
+        "type": "app",
+        "data": {
+          "root": "apps/web",
+          "name": "web",
+          "tags": [
+            "npm:public",
+            "npm:banyan",
+            "npm:libp2p",
+            "npm:documentation",
+            "npm:react",
+            "type:app",
+            "lang:typescript"
+          ],
+          "metadata": {
+            "targetGroups": {
+              "NPM Scripts": [
+                "start"
+              ]
+            },
+            "description": "Banyan LibP2P HTTP Proxy Documentation Site",
+            "js": {
+              "packageName": "@banyan/web",
+              "packageMain": "index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "start": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "start"
+              },
+              "metadata": {
+                "scriptContent": "webpack serve --mode development --open",
+                "runCommand": "npm run start"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "nx-release-publish": {
+              "executor": "@nx/js:release-publish",
+              "dependsOn": [
+                "^nx-release-publish"
+              ],
+              "options": {},
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "nx:run-commands",
+              "inputs": [
+                "typescript",
+                "{projectRoot}/public/**/*",
+                "{projectRoot}/webpack.config.js"
+              ],
+              "outputs": [
+                "{projectRoot}/dist"
+              ],
+              "options": {
+                "cwd": "apps/web",
+                "command": "webpack --mode production"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "cache": true
+            },
+            "dev": {
+              "executor": "nx:run-commands",
+              "options": {
+                "cwd": "apps/web",
+                "command": "webpack serve --mode development"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "serve": {
+              "executor": "nx:run-commands",
+              "options": {
+                "cwd": "apps/web",
+                "command": "webpack serve --mode development --open"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "projectType": "application",
+          "sourceRoot": "apps/web/src",
+          "implicitDependencies": []
+        }
+      }
+    },
+    "dependencies": {
+      "transport-i2p": [],
+      "transport-nym": [],
+      "proxy-addon": [
+        {
+          "source": "proxy-addon",
+          "target": "node",
+          "type": "implicit"
+        }
+      ],
+      "addon-sdk": [],
+      "topology-gen": [
+        {
+          "source": "topology-gen",
+          "target": "node",
+          "type": "implicit"
+        }
+      ],
+      "node": [],
+      "cli": [],
+      "web": []
+    }
+  }
+}

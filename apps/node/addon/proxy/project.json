@@ -1,0 +1,115 @@
+{
+  "name": "proxy-addon",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/node/addon/proxy",
+  "namedInputs": {
+    "go": ["{projectRoot}/**/*.go", "{projectRoot}/go.mod", "{projectRoot}/go.sum"],
+    "proxy-src": ["{projectRoot}/**/*.go"]
+  },
+  "implicitDependencies": ["node"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "inputs": ["proxy-src"],
+      "outputs": ["{workspaceRoot}/dist/addons"],
+      "options": {
+        "command": "go build -o dist/addons/proxy-addon ./apps/node/addon/proxy",
+        "cwd": "{workspaceRoot}"
+      },
+      "configurations": {
+        "windows": {
+          "command": "go build -o dist/addons/proxy-addon.exe ./apps/node/addon/proxy"
+        },
+        "debug-linux": {
+          "command": "GOOS=linux GOARCH=amd64 go build -o dist/apps/node/debug/linux/addons/proxy-addon ./apps/node/addon/proxy"
+        },
+        "debug-osx": {
+          "command": "GOOS=darwin GOARCH=amd64 go build -o dist/apps/node/debug/osx/addons/proxy-addon ./apps/node/addon/proxy"
+        },
+        "release-linux": {
+          "command": "GOOS=linux GOARCH=amd64 go build -ldflags=\"-s -w\" -o dist/addons/linux/proxy-addon ./apps/node/addon/proxy"
+        },
+        "release-osx-amd64": {
+          "command": "GOOS=darwin GOARCH=amd64 go build -ldflags=\"-s -w\" -o dist/addons/osx/proxy-addon-amd64 ./apps/node/addon/proxy"
+        },
+        "release-osx-arm64": {
+          "command": "GOOS=darwin GOARCH=arm64 go build -ldflags=\"-s -w\" -o dist/addons/osx/proxy-addon-arm64 ./apps/node/addon/proxy"
+        }
+      }
+    },
+    "build:all-platforms": {
+      "executor": "nx:run-commands",
+      "inputs": ["proxy-src"],
+      "outputs": ["{workspaceRoot}/dist/addons"],
+      "options": {
+        "commands": [
+          "GOOS=windows GOARCH=amd64 go build -o dist/addons/win/proxy-addon.exe ./apps/node/addon/proxy",
+          "GOOS=linux GOARCH=amd64 go build -o dist/addons/linux/proxy-addon ./apps/node/addon/proxy",
+          "GOOS=darwin GOARCH=amd64 go build -o dist/addons/osx/proxy-addon-amd64 ./apps/node/addon/proxy",
+          "GOOS=darwin GOARCH=arm64 go build -o dist/addons/osx/proxy-addon-arm64 ./apps/node/addon/proxy"
+        ],
+        "cwd": "{workspaceRoot}",
+        "parallel": false
+      },
+      "configurations": {
+        "windows": {
+          "commands": [
+            "powershell -Command \"$env:GOOS='windows'; $env:GOARCH='amd64'; go build -o dist/addons/win/proxy-addon.exe ./apps/node/addon/proxy\"",
+            "powershell -Command \"$env:GOOS='linux'; $env:GOARCH='amd64'; go build -o dist/addons/linux/proxy-addon ./apps/node/addon/proxy\"",
+            "powershell -Command \"$env:GOOS='darwin'; $env:GOARCH='amd64'; go build -o dist/addons/osx/proxy-addon-amd64 ./apps/node/addon/proxy\"",
+            "powershell -Command \"$env:GOOS='darwin'; $env:GOARCH='arm64'; go build -o dist/addons/osx/proxy-addon-arm64 ./apps/node/addon/proxy\""
+          ]
+        },
+        "release": {
+          "commands": [
+            "GOOS=windows GOARCH=amd64 go build -ldflags=\"-s -w\" -o dist/addons/win/proxy-addon.exe ./apps/node/addon/proxy",
+            "GOOS=linux GOARCH=amd64 go build -ldflags=\"-s -w\" -o dist/addons/linux/proxy-addon ./apps/node/addon/proxy",
+            "GOOS=darwin GOARCH=amd64 go build -ldflags=\"-s -w\" -o dist/addons/osx/proxy-addon-amd64 ./apps/node/addon/proxy",
+            "GOOS=darwin GOARCH=arm64 go build -ldflags=\"-s -w\" -o dist/addons/osx/proxy-addon-arm64 ./apps/node/addon/proxy"
+          ]
+        },
+        "release-windows": {
+          "commands": [
+            "powershell -Command \"$env:GOOS='windows'; $env:GOARCH='amd64'; go build -ldflags='-s -w' -o dist/addons/win/proxy-addon.exe ./apps/node/addon/proxy\"",
+            "powershell -Command \"$env:GOOS='linux'; $env:GOARCH='amd64'; go build -ldflags='-s -w' -o dist/addons/linux/proxy-addon ./apps/node/addon/proxy\"",
+            "powershell -Command \"$env:GOOS='darwin'; $env:GOARCH='amd64'; go build -ldflags='-s -w' -o dist/addons/osx/proxy-addon-amd64 ./apps/node/addon/proxy\"",
+            "powershell -Command \"$env:GOOS='darwin'; $env:GOARCH='arm64'; go build -ldflags='-s -w' -o dist/addons/osx/proxy-addon-arm64 ./apps/node/addon/proxy\""
+          ]
+        }
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "inputs": ["proxy-src"],
+      "options": {
+        "cwd": "apps/node/addon/proxy",
+        "command": "go test ./..."
+      }
+    },
+    "test:integration": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["node:build", "build"],
+      "inputs": ["proxy-src", "{projectRoot}/test-proxy-nodes.sh", "{projectRoot}/test-proxy-nodes.ps1"],
+      "options": {
+        "cwd": "apps/node/addon/proxy",
+        "command": "./test-proxy-nodes.sh"
+      },
+      "configurations": {
+        "windows": {
+          "command": "powershell -ExecutionPolicy Bypass -File test-proxy-nodes.ps1"
+        }
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "inputs": ["proxy-src"],
+      "options": {
+        "cwd": "apps/node/addon/proxy",
+        "command": "go vet ./..."
+      }
+    }
+  },
+  "tags": ["type:addon", "lang:go"]
+}
+

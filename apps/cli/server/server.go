@@ -14,6 +14,7 @@ import (
 	"banyan-cli/client"
 	"banyan-cli/config"
 	"banyan-cli/nodeproc"
+	"banyan-cli/session"
 
 	"github.com/gorilla/websocket"
 )
@@ -90,9 +91,32 @@ func (s *Server) ActiveClient() *client.Client {
 // AddInstance adds a new instance and returns its index
 func (s *Server) AddInstance(inst *NodeInstance) int {
 	s.instancesMu.Lock()
-	defer s.instancesMu.Unlock()
 	s.instances = append(s.instances, inst)
-	return len(s.instances) - 1
+	idx := len(s.instances) - 1
+	s.instancesMu.Unlock()
+	// Sync to session for instances API
+	s.SyncToSession()
+	return idx
+}
+
+// SyncToSession synchronizes the server's instance state to the global session
+// This ensures the instances API endpoint returns consistent data
+func (s *Server) SyncToSession() {
+	s.instancesMu.RLock()
+	defer s.instancesMu.RUnlock()
+
+	instances := make([]session.InstanceInfo, 0, len(s.instances))
+	for i, inst := range s.instances {
+		instances = append(instances, session.InstanceInfo{
+			Index:      i + 1, // 1-based for display
+			Address:    inst.Address,
+			Connected:  inst.Connected,
+			Active:     i == s.activeInstanceIdx,
+			Subprocess: inst.KillOnExit,
+			Name:       inst.Name,
+		})
+	}
+	session.Get().UpdateInstances(instances)
 }
 
 // SaveInstancesToConfig saves the current instances to the config file

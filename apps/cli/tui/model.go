@@ -257,6 +257,9 @@ func (m *Model) AddLog(message string) {
 
 // Init initializes the model
 func (m Model) Init() tea.Cmd {
+	// Mark TUI as active so session commands can be processed
+	session.Get().SetTUIActive(true)
+
 	cmds := []tea.Cmd{textinput.Blink, listenForSessionCommands(), animTick()}
 
 	// Connect to ALL saved instances on startup

@@ -15,10 +15,16 @@
       "outputs": ["{workspaceRoot}/dist/apps/topology-gen"],
       "options": {
         "cwd": "apps/topology-gen",
-        "command": "go build -o ../../dist/apps/topology-gen/generator.exe generator.go"
+        "command": "go build -o ../../dist/apps/topology-gen/generator generator.go"
       },
       "configurations": {
+        "windows": {
+          "command": "go build -o ../../dist/apps/topology-gen/generator.exe generator.go"
+        },
         "production": {
+          "command": "go build -ldflags=\"-s -w\" -o ../../dist/apps/topology-gen/generator generator.go"
+        },
+        "production-windows": {
           "command": "go build -ldflags=\"-s -w\" -o ../../dist/apps/topology-gen/generator.exe generator.go"
         }
       }
@@ -30,7 +36,12 @@
       "outputs": ["{workspaceRoot}/dist/topology/{args.name}"],
       "options": {
         "cwd": "{workspaceRoot}",
-        "command": "powershell -Command \"& .\\dist\\apps\\topology-gen\\generator.exe apps\\topology-gen\\{args.config} dist\\topology\\{args.name} --banyan-path=../../../../apps/node\""
+        "command": "./dist/apps/topology-gen/generator apps/topology-gen/{args.config} dist/topology/{args.name} --banyan-path=../../../../apps/node"
+      },
+      "configurations": {
+        "windows": {
+          "command": "powershell -Command \"& .\\dist\\apps\\topology-gen\\generator.exe apps\\topology-gen\\{args.config} dist\\topology\\{args.name} --banyan-path=../../../../apps/node\""
+        }
       }
     },
     "test": {

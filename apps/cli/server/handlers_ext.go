@@ -195,7 +195,11 @@ func (s *Server) handleNodeStart(w http.ResponseWriter, r *http.Request) {
 		ConfigPath string   `json:"configPath"`
 		ExtraArgs  []string `json:"extraArgs"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid request body: " + err.Error()})
+		return
+	}
 
 	// Determine executable path
 	execPath := req.NodePath

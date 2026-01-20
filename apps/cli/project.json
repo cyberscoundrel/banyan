@@ -10,29 +10,47 @@
   "targets": {
     "build": {
       "executor": "nx:run-commands",
-      "inputs": ["go"],
+      "dependsOn": ["web:build"],
+      "inputs": ["go", "{workspaceRoot}/apps/web/dist/**/*"],
       "outputs": ["{workspaceRoot}/dist/apps/cli"],
       "options": {
         "cwd": "apps/cli",
-        "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/cli"
-      }
-    },
-    "build:production": {
-      "executor": "nx:run-commands",
-      "inputs": ["go"],
-      "outputs": ["{workspaceRoot}/dist/apps/cli"],
-      "options": {
-        "cwd": "apps/cli",
-        "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/cli -Clean"
-      }
-    },
-    "build:unix": {
-      "executor": "nx:run-commands",
-      "inputs": ["go"],
-      "outputs": ["{workspaceRoot}/dist/apps/cli"],
-      "options": {
-        "cwd": "apps/cli",
-        "command": "./build.sh --output ../../dist/apps/cli"
+        "commands": [
+          {
+            "command": "./build.sh --output ../../dist/apps/cli",
+            "forwardAllArgs": false,
+            "description": "Build for Unix (Linux/macOS)"
+          }
+        ]
+      },
+      "configurations": {
+        "windows": {
+          "commands": [
+            {
+              "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/cli",
+              "forwardAllArgs": false,
+              "description": "Build for Windows"
+            }
+          ]
+        },
+        "production": {
+          "commands": [
+            {
+              "command": "./build.sh --output ../../dist/apps/cli --clean",
+              "forwardAllArgs": false,
+              "description": "Production build for Unix (Linux/macOS)"
+            }
+          ]
+        },
+        "production-windows": {
+          "commands": [
+            {
+              "command": "powershell -ExecutionPolicy Bypass -File build.ps1 -OutputDir ../../dist/apps/cli -Clean",
+              "forwardAllArgs": false,
+              "description": "Production build for Windows"
+            }
+          ]
+        }
       }
     },
     "test": {
@@ -45,10 +63,22 @@
     },
     "lint": {
       "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
       "inputs": ["go"],
       "options": {
         "cwd": "apps/cli",
-        "command": "go vet ./..."
+        "commands": [
+          "mkdir -p server/web/dist && cp -r ../web/dist/* server/web/dist/ 2>/dev/null || true",
+          "go vet ./..."
+        ]
+      },
+      "configurations": {
+        "windows": {
+          "commands": [
+            "if (!(Test-Path server/web/dist)) { New-Item -ItemType Directory -Force -Path server/web/dist | Out-Null }; if (Test-Path ../web/dist) { Copy-Item -Recurse -Force ../web/dist/* server/web/dist/ }",
+            "go vet ./..."
+          ]
+        }
       }
     },
     "fmt": {
