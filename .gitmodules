@@ -1,0 +1,6 @@
+[submodule "packages/transports/i2p"]
+	path = packages/transports/i2p
+	url = https://github.com/cyberscoundrel/go-libp2p-i2p-transport.git
+[submodule "packages/transports/nym"]
+	path = packages/transports/nym
+	url = https://github.com/cyberscoundrel/go-libp2p-nym.git
