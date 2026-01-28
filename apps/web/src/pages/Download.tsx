@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Download as DownloadIcon, ExternalLink, Shield, AlertTriangle } from 'lucide-react';
+import { Download as DownloadIcon, ExternalLink, Shield, AlertTriangle, ChevronDown, Package, Check } from 'lucide-react';
 
-interface DownloadInfo {
+interface Deliverable {
+  id: string;
   platform: string;
   arch: string;
   filename: string;
   size: string;
   sizeBytes: number;
   checksum: string;
+  contents: string[];
 }
 
 interface ReleaseMetadata {
@@ -16,29 +18,48 @@ interface ReleaseMetadata {
   buildDate: string;
   buildTime: string;
   whatsNew: string;
-  downloads?: {
-    windows: DownloadInfo;
-    linux: DownloadInfo;
-    macos_intel: DownloadInfo;
-    macos_arm: DownloadInfo;
+  deliverables?: {
+    windows_x64: Deliverable;
+    linux_x64: Deliverable;
+    macos_x64: Deliverable;
+    macos_arm64: Deliverable;
   };
 }
+
+// Use local dist in development, production URL otherwise
+const getBaseUrl = (): string => {
+  if (process.env.NODE_ENV === 'development') {
+    return '/releases';
+  }
+  return 'https://releases.banyan.cyberscoundrel.com';
+};
 
 const Download: React.FC = () => {
   const [metadata, setMetadata] = useState<ReleaseMetadata | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const baseUrl = getBaseUrl();
 
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        const response = await fetch('https://releases.banyan.cyberscoundrel.com/release-metadata.json');
+        const response = await fetch(`${baseUrl}/release-metadata.json`);
         if (response.ok) {
           const data = await response.json();
           setMetadata(data);
+          
+          // Auto-detect platform
+          const detectedPlatform = detectPlatform();
+          if (data.deliverables?.[detectedPlatform]) {
+            setSelectedPlatform(detectedPlatform);
+          } else if (data.deliverables) {
+            setSelectedPlatform(Object.keys(data.deliverables)[0]);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch release metadata:', error);
-        // Fallback metadata
         setMetadata({
           version: 'pre-release',
           commit: 'unknown',
@@ -52,53 +73,86 @@ const Download: React.FC = () => {
     };
 
     fetchMetadata();
-  }, []);
+  }, [baseUrl]);
 
-  // Get downloads from metadata or fallback to hardcoded values
-  const downloads = metadata?.downloads ? [
-    metadata.downloads.windows,
-    metadata.downloads.macos_intel,
-    metadata.downloads.macos_arm,
-    metadata.downloads.linux,
-  ] : [
-    {
-      platform: 'Windows',
-      arch: 'x64',
-      filename: 'banyan.exe',
-      size: '12.3 MB',
-      sizeBytes: 12900000,
-      checksum: 'sha256:a1b2c3d4e5f6...',
-    },
-    {
-      platform: 'macOS',
-      arch: 'x64 (Intel)',
-      filename: 'banyan-amd64',
-      size: '11.8 MB',
-      sizeBytes: 12300000,
-      checksum: 'sha256:f6e5d4c3b2a1...',
-    },
-    {
-      platform: 'macOS',
-      arch: 'ARM64 (Apple Silicon)',
-      filename: 'banyan-arm64',
-      size: '11.2 MB',
-      sizeBytes: 11700000,
-      checksum: 'sha256:b2a1c3d4e5f6...',
-    },
-    {
-      platform: 'Linux',
-      arch: 'x64',
-      filename: 'banyan',
-      size: '11.5 MB',
-      sizeBytes: 12000000,
-      checksum: 'sha256:c3d4e5f6a1b2...',
-    },
-  ];
+  // Detect user's platform
+  const detectPlatform = (): string => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const platform = navigator.platform.toLowerCase();
+    
+    if (userAgent.includes('win')) {
+      return 'windows_x64';
+    } else if (userAgent.includes('mac')) {
+      // Check for Apple Silicon
+      if (platform.includes('arm') || (userAgent.includes('mac') && !userAgent.includes('intel'))) {
+        return 'macos_arm64';
+      }
+      return 'macos_x64';
+    } else if (userAgent.includes('linux')) {
+      return 'linux_x64';
+    }
+    return 'windows_x64';
+  };
+
+  const deliverables: Deliverable[] = metadata?.deliverables 
+    ? Object.values(metadata.deliverables)
+    : [
+        {
+          id: 'windows_x64',
+          platform: 'Windows',
+          arch: 'x64',
+          filename: 'banyan-windows-x64.zip',
+          size: '25 MB',
+          sizeBytes: 26214400,
+          checksum: 'sha256:pending...',
+          contents: ['banyan.exe', 'banyan-cli.exe', 'README.txt'],
+        },
+        {
+          id: 'linux_x64',
+          platform: 'Linux',
+          arch: 'x64',
+          filename: 'banyan-linux-x64.tar.gz',
+          size: '24 MB',
+          sizeBytes: 25165824,
+          checksum: 'sha256:pending...',
+          contents: ['banyan', 'banyan-cli', 'README.md'],
+        },
+        {
+          id: 'macos_x64',
+          platform: 'macOS',
+          arch: 'x64 (Intel)',
+          filename: 'banyan-macos-x64.tar.gz',
+          size: '24 MB',
+          sizeBytes: 25165824,
+          checksum: 'sha256:pending...',
+          contents: ['banyan', 'banyan-cli', 'README.md'],
+        },
+        {
+          id: 'macos_arm64',
+          platform: 'macOS',
+          arch: 'ARM64 (Apple Silicon)',
+          filename: 'banyan-macos-arm64.tar.gz',
+          size: '23 MB',
+          sizeBytes: 24117248,
+          checksum: 'sha256:pending...',
+          contents: ['banyan', 'banyan-cli', 'README.md'],
+        },
+      ];
+
+  const selectedDeliverable = deliverables.find(d => d.id === selectedPlatform) || deliverables[0];
+
+  const getPlatformIcon = (platform: string): string => {
+    switch (platform.toLowerCase()) {
+      case 'windows': return '🪟';
+      case 'linux': return '🐧';
+      case 'macos': return '🍎';
+      default: return '💻';
+    }
+  };
 
   return (
     <div className="prose max-w-none">
       <h1>Download Banyan</h1>
-      
 
       <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
         <div className="flex items-start space-x-2">
@@ -134,112 +188,165 @@ const Download: React.FC = () => {
         <p>{metadata?.whatsNew || 'nothing 😊'}</p>
       )}
 
-      <h2>Download Links</h2>
-      <div className="grid gap-4 not-prose">
-        {downloads.map((download, index) => (
-          <div
-            key={index}
-            className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-primary-300 dark:hover:border-primary-600 transition-colors"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-2 mb-1">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {download.platform}
-                  </h3>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {download.arch}
-                  </span>
+      <h2>Download</h2>
+      
+      <div className="not-prose">
+        {/* Platform Selector */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Select your platform
+          </label>
+          <div className="relative">
+            <button
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="w-full md:w-80 flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:border-primary-500 dark:hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <div className="flex items-center space-x-3">
+                <span className="text-xl">{getPlatformIcon(selectedDeliverable.platform)}</span>
+                <div className="text-left">
+                  <div className="font-medium text-gray-900 dark:text-white">
+                    {selectedDeliverable.platform}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {selectedDeliverable.arch}
+                  </div>
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  {download.filename} • {download.size}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-500 font-mono">
-                  {download.checksum}
-                </p>
               </div>
-              <a 
-                href={`https://releases.banyan.cyberscoundrel.com/${download.platform === 'macOS' ? 'osx' : download.platform === 'Windows' ? 'win' : download.platform.toLowerCase()}/${download.filename}`}
-                download
-                className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                <DownloadIcon className="w-4 h-4" />
-                <span>Download</span>
-              </a>
-            </div>
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute z-10 mt-1 w-full md:w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
+                {deliverables.map((deliverable) => (
+                  <button
+                    key={deliverable.id}
+                    onClick={() => {
+                      setSelectedPlatform(deliverable.id);
+                      setDropdownOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 first:rounded-t-lg last:rounded-b-lg"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <span className="text-xl">{getPlatformIcon(deliverable.platform)}</span>
+                      <div className="text-left">
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {deliverable.platform}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {deliverable.arch}
+                        </div>
+                      </div>
+                    </div>
+                    {selectedPlatform === deliverable.id && (
+                      <Check className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        ))}
+        </div>
+
+        {/* Download Card */}
+        <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-6 bg-gray-50 dark:bg-gray-800/50">
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center space-x-2 mb-2">
+                <Package className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white m-0">
+                  {selectedDeliverable.filename}
+                </h3>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                {selectedDeliverable.size} • {selectedDeliverable.platform} {selectedDeliverable.arch}
+              </p>
+              
+              <div className="mb-3">
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Package contents:</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedDeliverable.contents.map((file, idx) => (
+                    <span 
+                      key={idx}
+                      className="inline-flex items-center px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs font-mono text-gray-700 dark:text-gray-300"
+                    >
+                      {file}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-500">
+                <Shield className="w-3 h-3" />
+                <span className="font-mono break-all">{selectedDeliverable.checksum}</span>
+              </div>
+            </div>
+
+            <a
+              href={`${baseUrl}/${selectedDeliverable.filename}`}
+              download
+              className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all"
+            >
+              <DownloadIcon className="w-5 h-5" />
+              <span>Download</span>
+            </a>
+          </div>
+        </div>
       </div>
 
       <h2>Installation Instructions</h2>
 
       <h3>Windows</h3>
       <ol>
-        <li>Download the Windows executable</li>
-        <li>Open Command Prompt or PowerShell</li>
-        <li>Navigate to the download location</li>
-        <li>Run: <code>banyan.exe</code></li>
+        <li>Download and extract the ZIP file</li>
+        <li>Open Command Prompt or PowerShell in the extracted folder</li>
+        <li>Run <code>banyan-cli.exe</code> for the terminal UI, or <code>banyan.exe</code> for headless operation</li>
       </ol>
 
       <h3>macOS</h3>
       <ol>
-        <li>Download the appropriate macOS binary for your architecture</li>
-        <li>Open Terminal</li>
-        <li>Make the binary executable: <code>chmod +x banyan-*</code></li>
-        <li>Run: <code>./banyan-amd64</code> (Intel) or <code>./banyan-arm64</code> (Apple Silicon)</li>
+        <li>Download and extract the tar.gz file: <code>tar -xzf banyan-macos-*.tar.gz</code></li>
+        <li>Navigate to the extracted folder: <code>cd banyan</code></li>
+        <li>Make the binaries executable: <code>chmod +x banyan banyan-cli</code></li>
+        <li>Run <code>./banyan-cli</code> for the terminal UI</li>
       </ol>
       <p>
-        <strong>Note:</strong> You may need to allow the binary in System Preferences → Security & Privacy 
-        if macOS blocks it due to being unsigned.
+        <strong>Note:</strong> You may need to allow the binaries in System Preferences → Security & Privacy 
+        if macOS blocks them due to being unsigned.
       </p>
 
       <h3>Linux</h3>
       <ol>
-        <li>Download the Linux binary for your architecture</li>
-        <li>Open a terminal</li>
-        <li>Make the binary executable: <code>chmod +x banyan</code></li>
-        <li>Run: <code>./banyan</code></li>
+        <li>Download and extract the tar.gz file: <code>tar -xzf banyan-linux-x64.tar.gz</code></li>
+        <li>Navigate to the extracted folder: <code>cd banyan</code></li>
+        <li>Make the binaries executable: <code>chmod +x banyan banyan-cli</code></li>
+        <li>Run <code>./banyan-cli</code> for the terminal UI</li>
       </ol>
 
       <h2>Verification</h2>
       <p>To verify the integrity of your download, check the SHA256 checksum:</p>
 
       <h3>Windows (PowerShell)</h3>
-      <pre><code>Get-FileHash banyan.exe -Algorithm SHA256</code></pre>
-      {metadata?.downloads?.windows && (
-        <p>Expected: <code>{metadata.downloads.windows.checksum}</code></p>
-      )}
+      <pre><code>Get-FileHash banyan-windows-x64.zip -Algorithm SHA256</code></pre>
 
       <h3>macOS/Linux</h3>
-      <pre><code>sha256sum banyan*</code></pre>
-      {metadata?.downloads && (
-        <div>
-          <p><strong>Expected checksums:</strong></p>
-          <ul>
-            <li>Linux: <code>{metadata.downloads.linux.checksum}</code></li>
-            <li>macOS Intel: <code>{metadata.downloads.macos_intel.checksum}</code></li>
-            <li>macOS ARM: <code>{metadata.downloads.macos_arm.checksum}</code></li>
-          </ul>
-        </div>
-      )}
+      <pre><code>sha256sum banyan-*.tar.gz</code></pre>
 
-      <p>Compare the output with the checksum listed above for your platform.</p>
+      <p>Compare the output with the checksum shown above for your platform.</p>
 
       <h2>System Requirements</h2>
       <ul>
         <li><strong>Memory:</strong> Minimum 512 MB RAM, recommended 1 GB+</li>
-        <li><strong>Disk Space:</strong> 50 MB for binary, additional space for logs and keys</li>
+        <li><strong>Disk Space:</strong> 100 MB for binaries, additional space for logs and keys</li>
         <li><strong>Network:</strong> Internet connection for peer discovery (DHT)</li>
         <li><strong>Ports:</strong> Random high port for LibP2P (configurable)</li>
       </ul>
 
       <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 mt-8">
         <ExternalLink className="w-4 h-4" />
-        <span>Looking for source code? It will be available after the open source release.</span>
+        <span>Looking for source code? Visit the project repository on GitHub.</span>
       </div>
     </div>
   );
 };
 
 export default Download;
-

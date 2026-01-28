@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  # Use this service when you have the repo cloned locally
+  banyan-web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  # Use this service to clone from GitHub (uncomment and set REPO_URL)
+  # banyan-web-standalone:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.standalone
+  #     args:
+  #       REPO_URL: https://github.com/YOUR_ORG/banyan-web-docs.git
+  #       BRANCH: main
+  #   ports:
+  #     - "8080:80"
+  #   restart: unless-stopped
