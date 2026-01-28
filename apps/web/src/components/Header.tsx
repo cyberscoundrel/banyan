@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -8,13 +9,13 @@ const Header: React.FC = () => {
   return (
     <header className="bg-white dark:bg-gray-900 px-8 py-4 w-full">
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+        <Link to="/" className="flex items-center space-x-4 hover:opacity-80 transition-opacity">
           {/* Logo */}
           <img src="/fig.svg" alt="Banyan Logo" className="w-8 h-8" />
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
             Banyan Project
           </h1>
-        </div>
+        </Link>
         <button
           onClick={toggleTheme}
           className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
