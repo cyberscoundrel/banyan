@@ -1,15 +1,12 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  Home, 
-  Download, 
-  BookOpen, 
-  Terminal, 
-  Code, 
-  FileText, 
-  HelpCircle, 
-  Zap,
-  Eye
+import {
+  Home,
+  Download,
+  BookOpen,
+  Terminal,
+  Code,
+  FileText
 } from 'lucide-react';
 
 const navigation = [
@@ -18,9 +15,7 @@ const navigation = [
   { name: 'Usage', href: '/usage', icon: Terminal },
   { name: 'API Reference', href: '/api', icon: Code },
   { name: 'Examples', href: '/examples', icon: FileText },
-  { name: 'Troubleshooting', href: '/troubleshooting', icon: HelpCircle },
-  { name: 'Future Plans', href: '/future', icon: Zap },
-  { name: 'Transparency', href: '/transparency', icon: Eye },
+  { name: 'Documentation', href: '/docs', icon: BookOpen },
 ];
 
 const Sidebar: React.FC = () => {

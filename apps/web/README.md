@@ -1,14 +1,14 @@
-# Banyan Documentation Website
+# Banyan Web Documentation
 
-A modern, minimal documentation website for Banyan - the LibP2P HTTP Proxy Node. Built with React, TypeScript, Webpack, Tailwind CSS, and React Router.
+A modern, minimal documentation website for Banyan - the open-source peer-to-peer networking multitool. Built with React, TypeScript, Webpack, Tailwind CSS, and React Router.
 
 ## Features
 
 - 📱 Responsive design with elegant minimal styling
 - 🌓 Dark/Light mode toggle
-- 🧭 Left sidebar navigation like a documentation site
-- 📚 Complete documentation from markdown sources
-- 📦 Download section for prerelease builds
+- 🧭 Dynamic sidebar navigation (main site + documentation)
+- 📚 Comprehensive documentation structure with topics and subtopics
+- 📦 Download section for releases
 - ⚡ Fast Webpack-based build system
 - 🎨 Tailwind CSS for styling
 - 🔷 TypeScript for type safety
@@ -48,27 +48,26 @@ The built files will be in the `dist/` directory.
 ## Project Structure
 
 ```
-webpage/
+apps/web/
 ├── public/
 │   ├── index.html
-│   └── favicon.ico
+│   └── fig.svg
 ├── src/
 │   ├── components/
 │   │   ├── Header.tsx        # Header with logo and theme toggle
-│   │   ├── Layout.tsx        # Main layout wrapper
-│   │   └── Sidebar.tsx       # Left navigation sidebar
+│   │   ├── Layout.tsx        # Main layout wrapper with conditional sidebar
+│   │   ├── Sidebar.tsx       # Main navigation sidebar
+│   │   └── DocsSidebar.tsx   # Documentation navigation sidebar
 │   ├── contexts/
 │   │   └── ThemeContext.tsx  # Theme management
 │   ├── pages/
 │   │   ├── Home.tsx          # Overview page
-│   │   ├── Installation.tsx  # Installation guide
 │   │   ├── Usage.tsx         # Usage documentation
 │   │   ├── API.tsx           # API reference
 │   │   ├── Examples.tsx      # Usage examples
-│   │   ├── Troubleshooting.tsx
-│   │   ├── Future.tsx        # Future plans
-│   │   └── Download.tsx      # Download prerelease builds
-│   ├── App.tsx               # Main app component
+│   │   ├── Download.tsx      # Download releases
+│   │   └── Docs.tsx          # Documentation hub (placeholder)
+│   ├── App.tsx               # Main app component with routing
 │   ├── index.tsx             # Entry point
 │   └── index.css             # Global styles and Tailwind
 ├── package.json
@@ -78,18 +77,22 @@ webpage/
 └── README.md
 ```
 
-## Content Sources
+## Site Structure
 
-The documentation content is derived from the main `Banyan_Documentation.md` file and organized into logical sections:
+The website is organized into two main sections:
 
-- **Home**: Overview and capabilities
-- **Installation**: Setup and configuration
-- **Usage**: Basic usage and best practices  
-- **API**: Complete API reference
-- **Examples**: Usage examples and scenarios
-- **Troubleshooting**: Common issues and solutions
-- **Future**: Project roadmap and plans
-- **Download**: Prerelease binary downloads
+### Main Site
+- **Overview**: Introduction to Banyan and its use cases
+- **Download**: Release downloads and installation instructions
+- **Usage**: Basic usage and command-line options
+- **API Reference**: Complete REST API documentation
+- **Examples**: Common usage scenarios and code samples
+
+### Documentation Section (`/docs`)
+- Comprehensive documentation with expandable topics and subtopics
+- Dedicated documentation sidebar with collapsible sections
+- Placeholder structure ready for content population
+- Topics include: Getting Started, Core Concepts, Guides, API Reference, Advanced Topics, and Contributing
 
 ## Theming
 
@@ -129,6 +132,10 @@ The site uses Inter font family with JetBrains Mono for code. Update in `tailwin
 
 ### Content
 Update the page components in `src/pages/` to modify the documentation content.
+
+## About Banyan
+
+Banyan is an open-source peer-to-peer networking multitool that transforms traditional web applications and microservices into decentralized systems without requiring code changes. Built on LibP2P, it provides HTTP proxy functionality, peer discovery, service management, and real-time monitoring.
 
 ## Deployment
 

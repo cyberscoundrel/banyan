@@ -21,6 +21,9 @@
       "inputs": ["default"],
       "cache": true
     },
+    "package": {
+      "cache": true
+    },
     "test": {
       "dependsOn": ["build"],
       "inputs": ["default"],

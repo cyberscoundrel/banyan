@@ -5,7 +5,7 @@
 
 webpage/
 **/node_modules/
-/dist/
+**/dist/
 
 
 

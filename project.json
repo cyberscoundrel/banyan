@@ -1,0 +1,37 @@
+{
+  "name": "workspace",
+  "$schema": "node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "tags": ["scope:workspace"],
+  "implicitDependencies": ["node", "cli"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["node:build", "cli:build"],
+      "inputs": [
+        "{workspaceRoot}/dist/apps/node/**/*",
+        "{workspaceRoot}/dist/apps/cli/**/*"
+      ],
+      "outputs": ["{workspaceRoot}/dist/deliverables"],
+      "options": {
+        "command": "bash scripts/create-deliverables.sh dist/deliverables dist/apps/node dist/apps/cli"
+      },
+      "configurations": {
+        "windows": {
+          "command": "powershell -ExecutionPolicy Bypass -File scripts/create-deliverables.ps1 -OutputDir dist/deliverables -NodeDir dist/apps/node -CliDir dist/apps/cli"
+        }
+      }
+    },
+    "release": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build", "web:build"],
+      "options": {
+        "commands": [
+          "echo '📦 Release artifacts ready in dist/deliverables'",
+          "echo '🌐 Web app ready in apps/web/dist'"
+        ],
+        "parallel": false
+      }
+    }
+  }
+}
