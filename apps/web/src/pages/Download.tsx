@@ -94,51 +94,59 @@ const Download: React.FC = () => {
     return 'windows_x64';
   };
 
-  const deliverables: Deliverable[] = metadata?.deliverables 
-    ? Object.values(metadata.deliverables)
-    : [
-        {
-          id: 'windows_x64',
-          platform: 'Windows',
-          arch: 'x64',
-          filename: 'banyan-windows-x64.zip',
-          size: '25 MB',
-          sizeBytes: 26214400,
-          checksum: 'sha256:pending...',
-          contents: ['banyan.exe', 'banyan-cli.exe', 'README.txt'],
-        },
-        {
-          id: 'linux_x64',
-          platform: 'Linux',
-          arch: 'x64',
-          filename: 'banyan-linux-x64.tar.gz',
-          size: '24 MB',
-          sizeBytes: 25165824,
-          checksum: 'sha256:pending...',
-          contents: ['banyan', 'banyan-cli', 'README.md'],
-        },
-        {
-          id: 'macos_x64',
-          platform: 'macOS',
-          arch: 'x64 (Intel)',
-          filename: 'banyan-macos-x64.tar.gz',
-          size: '24 MB',
-          sizeBytes: 25165824,
-          checksum: 'sha256:pending...',
-          contents: ['banyan', 'banyan-cli', 'README.md'],
-        },
-        {
-          id: 'macos_arm64',
-          platform: 'macOS',
-          arch: 'ARM64 (Apple Silicon)',
-          filename: 'banyan-macos-arm64.tar.gz',
-          size: '23 MB',
-          sizeBytes: 24117248,
-          checksum: 'sha256:pending...',
-          contents: ['banyan', 'banyan-cli', 'README.md'],
-        },
-      ];
+  // Default fallback deliverables in case metadata is missing or empty
+  const defaultDeliverables: Deliverable[] = [
+    {
+      id: 'windows_x64',
+      platform: 'Windows',
+      arch: 'x64',
+      filename: 'banyan-windows-x64.zip',
+      size: '25 MB',
+      sizeBytes: 26214400,
+      checksum: 'sha256:pending...',
+      contents: ['banyan.exe', 'banyan-cli.exe', 'README.txt'],
+    },
+    {
+      id: 'linux_x64',
+      platform: 'Linux',
+      arch: 'x64',
+      filename: 'banyan-linux-x64.tar.gz',
+      size: '24 MB',
+      sizeBytes: 25165824,
+      checksum: 'sha256:pending...',
+      contents: ['banyan', 'banyan-cli', 'README.md'],
+    },
+    {
+      id: 'macos_x64',
+      platform: 'macOS',
+      arch: 'x64 (Intel)',
+      filename: 'banyan-macos-x64.tar.gz',
+      size: '24 MB',
+      sizeBytes: 25165824,
+      checksum: 'sha256:pending...',
+      contents: ['banyan', 'banyan-cli', 'README.md'],
+    },
+    {
+      id: 'macos_arm64',
+      platform: 'macOS',
+      arch: 'ARM64 (Apple Silicon)',
+      filename: 'banyan-macos-arm64.tar.gz',
+      size: '23 MB',
+      sizeBytes: 24117248,
+      checksum: 'sha256:pending...',
+      contents: ['banyan', 'banyan-cli', 'README.md'],
+    },
+  ];
 
+  // Use deliverables from metadata if available and non-empty, otherwise use defaults
+  const metadataDeliverables = metadata?.deliverables
+    ? Object.values(metadata.deliverables)
+    : [];
+  const deliverables: Deliverable[] = metadataDeliverables.length > 0
+    ? metadataDeliverables
+    : defaultDeliverables;
+
+  // Safely select deliverable with guaranteed fallback
   const selectedDeliverable = deliverables.find(d => d.id === selectedPlatform) || deliverables[0];
 
   const getPlatformIcon = (platform: string): string => {

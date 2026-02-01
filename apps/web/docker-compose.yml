@@ -2,6 +2,10 @@ version: '3.8'
 
 services:
   # Use this service when you have the repo cloned locally
+  # Note: context is set to monorepo root (../..) because Dockerfile needs
+  # access to monorepo-level files (tsconfig.base.json, nx.json, etc.)
+  # The .dockerignore at the repo root will be used to exclude node_modules
+  # and other build artifacts from the Docker build context
   banyan-web:
     build:
       context: ../..

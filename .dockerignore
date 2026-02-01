@@ -1,0 +1,105 @@
+# .dockerignore for monorepo root
+# This file is used when building Docker images with context set to the monorepo root
+# (e.g., when using apps/web/docker-compose.yml which sets context: ../..)
+
+# Dependencies - exclude all node_modules to avoid sending host artifacts to Docker
+node_modules
+**/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build output - we rebuild in container
+dist
+**/dist
+build
+**/build
+.next
+**/.next
+out
+**/out
+
+# Git
+.git
+.gitignore
+.gitattributes
+**/.git
+
+# IDE
+.idea
+**/.idea
+.vscode
+**/.vscode
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs
+**/logs
+
+# Test
+coverage
+**/.nyc_output
+**/coverage
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.test.js
+**/*.test.jsx
+**/*.spec.ts
+**/*.spec.tsx
+**/*.spec.js
+**/*.spec.jsx
+
+# Environment
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+
+# Misc
+*.md
+!README.md
+.eslintcache
+**/.eslintcache
+.cache
+**/.cache
+tmp
+**/tmp
+temp
+**/temp
+
+# Docker
+**/Dockerfile
+**/docker-compose.yml
+**/.dockerignore
+!apps/web/Dockerfile
+!apps/web/docker-compose.yml
+!apps/web/nginx.conf
+
+# CI/CD
+.github
+**/.github
+.gitlab-ci.yml
+**/.gitlab-ci.yml
+.circleci
+**/.circleci
+
+# Documentation (exclude to reduce build context size)
+docs
+**/docs
+*.md
+!apps/web/README.md
+

@@ -35,7 +35,9 @@ module.exports = (env, argv) => {
         favicon: './public/fig.svg',
       }),
       new webpack.DefinePlugin({
-        'process.env.NODE_ENV': JSON.stringify(argv.mode || 'development'),
+        // Use isProduction to set NODE_ENV - in dev mode, downloads come from local filesystem
+        // via devServer static config; in production (Docker), downloads come from Cloudflare bucket
+        'process.env.NODE_ENV': JSON.stringify(isProduction ? 'production' : 'development'),
       }),
     ],
     devServer: {
