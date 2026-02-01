@@ -8,9 +8,12 @@
   ],
   "scripts": {
     "build": "nx run-many -t build",
+    "build:windows": "nx run-many -t build --configuration=windows",
     "build:node": "nx build node",
     "build:web": "nx build web",
+    "build:cli": "nx build cli",
     "build:topology-gen": "nx build topology-gen",
+    "release": "nx run workspace:release",
     "test": "nx run-many -t test",
     "lint": "nx run-many -t lint",
     "dev": "nx run-many -t dev",

@@ -1,0 +1,40 @@
+# NOTE: This .dockerignore is NOT used when building with docker-compose.yml
+# because the build context is set to the monorepo root (../..)
+# In that case, the .dockerignore at the repo root is used instead.
+# This file is only used if building directly from apps/web with Dockerfile.standalone
+
+# Dependencies
+node_modules
+**/node_modules
+
+# Build output (we rebuild in container)
+dist
+**/dist
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test
+coverage
+.nyc_output
+
+# Misc
+*.md
+!README.md
+.env*
+.eslintcache

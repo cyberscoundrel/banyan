@@ -7,8 +7,48 @@
     scroll-behavior: smooth;
   }
   
-  body {
-    @apply transition-colors duration-200;
+  /* Global synchronized theme transition */
+  *,
+  *::before,
+  *::after {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+  
+  /* Custom scrollbar for docs sidebar */
+  .docs-sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  
+  .docs-sidebar-scroll:hover {
+    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+  }
+  
+  .docs-sidebar-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .docs-sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .docs-sidebar-scroll::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 3px;
+  }
+  
+  .docs-sidebar-scroll:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.5);
+  }
+  
+  .dark .docs-sidebar-scroll:hover {
+    scrollbar-color: rgba(75, 85, 99, 0.7) transparent;
+  }
+  
+  .dark .docs-sidebar-scroll:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(75, 85, 99, 0.7);
   }
   
   code {
@@ -86,4 +126,3 @@
     @apply border-l-4 border-primary-500 pl-4 italic text-gray-600 dark:text-gray-400 mb-4;
   }
 }
-
