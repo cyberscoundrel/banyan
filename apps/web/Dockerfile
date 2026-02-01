@@ -1,12 +1,17 @@
-# Dockerfile for building and serving the Banyan web app from local files
+﻿# Dockerfile for building and serving the Banyan web app from local files
 # Use this when you've already cloned the repository
 #
-# Build:   docker build -t banyan-web .
-# Run:     docker run -p 8080:80 banyan-web
+# IMPORTANT: This Dockerfile MUST be built from the monorepo root, not from apps/web
+# It requires access to monorepo-level files (tsconfig.base.json, nx.json, etc.)
 #
-# Or from the monorepo root:
-# Build:   docker build -t banyan-web -f apps/web/Dockerfile .
-# Run:     docker run -p 8080:80 banyan-web
+# Build from monorepo root:
+#   docker build -t banyan-web -f apps/web/Dockerfile .
+#
+# Run:
+#   docker run -p 8080:80 banyan-web
+#
+# Or use docker-compose from apps/web directory:
+#   cd apps/web && docker-compose up
 
 # Stage 1: Build the application
 FROM node:20-alpine AS builder
@@ -36,7 +41,7 @@ FROM nginx:alpine AS production
 
 # Copy custom nginx config for SPA routing
 RUN rm /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy built assets
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html

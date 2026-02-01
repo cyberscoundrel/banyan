@@ -81,7 +81,8 @@ const DocsHome: React.FC = () => {
 const Docs: React.FC = () => {
   return (
     <Routes>
-      <Route path="/" element={<DocsHome />} />
+      <Route index element={<DocsHome />} />
+      <Route path="*" element={<DocsHome />} />
       {/* Future documentation routes will be added here */}
     </Routes>
   );
