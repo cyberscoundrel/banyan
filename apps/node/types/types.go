@@ -55,6 +55,7 @@ const (
 	EventConnection       = "connection"
 	EventError            = "error"
 	EventInfo             = "info"
+	EventNATStatus        = "nat_status"
 )
 
 // Event system for real-time streaming
