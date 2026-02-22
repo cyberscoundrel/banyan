@@ -65,6 +65,17 @@ func (lh *LibP2PHandlers) HandleStatus(w http.ResponseWriter, r *http.Request) {
 		"dht_enabled":              lh.node.GetDiscoveryManager().IsDHTEnabled(),
 		"discovery_methods":        lh.node.GetDiscoveryManager().GetDiscoveryMethods(),
 		"timestamp":                time.Now(),
+		"nat_status": map[string]interface{}{
+			"enabled":      lh.node.IsNATTraversalEnabled(),
+			"reachability": lh.node.GetNATReachability(),
+			"relay_addr":   lh.node.HasRelayAddr(),
+			"relay_addrs":  lh.node.GetRelayAddrs(),
+		},
+		"dht_status": map[string]interface{}{
+			"enabled":      lh.node.GetDiscoveryManager().IsDHTEnabled(),
+			"ready":        lh.node.IsDHTReady(),
+			"routing_size": lh.node.GetDHTRoutingTableSize(),
+		},
 	}
 
 	w.Header().Set("Content-Type", "application/json")
