@@ -1,0 +1,50 @@
+# Banyan Node - Remote Testing (Repo / Build from Source)
+#
+# Multi-stage build: compiles the node from the monorepo source, then copies
+# the binary into a slim runtime image with the remote-testing config.
+#
+# Build context MUST be the monorepo root so the Go workspace resolves:
+#   docker build -f deploy/docker/remote-testing/Dockerfile.dev -t banyan-remote .
+#   docker run -p 9000:9000 banyan-remote
+#
+
+# ---------- builder stage ----------
+FROM golang:1.24-bookworm AS builder
+
+WORKDIR /src
+
+# Copy go workspace files first for layer caching
+COPY go.work go.work.sum ./
+
+# Copy all module directories referenced by go.work
+COPY apps/node/ apps/node/
+COPY apps/cli/ apps/cli/
+COPY apps/topology-gen/ apps/topology-gen/
+COPY packages/addon-sdk/ packages/addon-sdk/
+COPY packages/transports/i2p/ packages/transports/i2p/
+COPY packages/transports/nym/ packages/transports/nym/
+
+# Download dependencies and build
+RUN cd apps/node && go mod download
+RUN cd apps/node && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -o /out/banyan .
+
+# ---------- runtime stage ----------
+FROM debian:bookworm-slim
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /out/banyan ./banyan
+RUN chmod +x ./banyan
+
+RUN mkdir -p /app/config
+COPY deploy/configs/remote-testing.json /app/config/remote-testing.json
+
+EXPOSE 9000/tcp
+EXPOSE 9000/udp
+
+ENTRYPOINT ["./banyan", "-config=/app/config/remote-testing.json"]

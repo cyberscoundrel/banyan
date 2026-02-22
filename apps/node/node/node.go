@@ -11,11 +11,14 @@ import (
 	"strings"
 	"time"
 
+	"sync/atomic"
+
 	"github.com/libp2p/go-libp2p"
 	p2phttp "github.com/libp2p/go-libp2p-http"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -96,6 +99,11 @@ type Node struct {
 	// Router table for URL routing
 	routeTable *types.RouteTable
 
+	// NAT traversal status tracking
+	natReachability atomic.Int32 // stores network.Reachability values
+	hasRelayAddr    atomic.Bool
+	dhtReady        atomic.Bool
+
 	// Configuration
 	config *Config
 
@@ -127,10 +135,34 @@ func NewNode(ctx context.Context, config *Config, keyLoader PrivateKeyLoader) (*
 	}
 
 	// Configure NAT traversal if enabled
+	var relayDHT *dht.IpfsDHT
+	var relayHost host.Host
 	if config.NATTraversal != nil && *config.NATTraversal {
+		peerSource := func(ctx context.Context, num int) <-chan peer.AddrInfo {
+			ch := make(chan peer.AddrInfo, num)
+			go func() {
+				defer close(ch)
+				if relayDHT == nil || relayHost == nil {
+					return
+				}
+				for _, p := range relayDHT.RoutingTable().ListPeers() {
+					addrs := relayHost.Peerstore().Addrs(p)
+					if len(addrs) == 0 {
+						continue
+					}
+					select {
+					case ch <- peer.AddrInfo{ID: p, Addrs: addrs}:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+			return ch
+		}
+
 		opts = append(opts,
 			libp2p.EnableHolePunching(),
-			libp2p.EnableAutoRelay(),
+			libp2p.EnableAutoRelayWithPeerSource(peerSource),
 			libp2p.NATPortMap(),
 		)
 		fmt.Println("NAT traversal enabled: hole punching + auto-relay + UPnP")
@@ -141,6 +173,7 @@ func NewNode(ctx context.Context, config *Config, keyLoader PrivateKeyLoader) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libp2p host: %w", err)
 	}
+	relayHost = h
 
 	// Initialize DHT conditionally
 	var kademliaDHT *dht.IpfsDHT
@@ -150,6 +183,7 @@ func NewNode(ctx context.Context, config *Config, keyLoader PrivateKeyLoader) (*
 		if err != nil {
 			return nil, fmt.Errorf("failed to create DHT: %w", err)
 		}
+		relayDHT = kademliaDHT
 
 		// Determine which bootstrap peers to use
 		var bootstrapPeers []peer.AddrInfo
@@ -308,6 +342,66 @@ func NewNode(ctx context.Context, config *Config, keyLoader PrivateKeyLoader) (*
 		}
 	}
 
+	// Subscribe to libp2p event bus for NAT reachability and address changes
+	if config.NATTraversal != nil && *config.NATTraversal {
+		evtSub, err := h.EventBus().Subscribe([]interface{}{
+			new(event.EvtLocalReachabilityChanged),
+			new(event.EvtLocalAddressesUpdated),
+		})
+		if err == nil {
+			go func() {
+				defer evtSub.Close()
+				for evt := range evtSub.Out() {
+					switch e := evt.(type) {
+					case event.EvtLocalReachabilityChanged:
+						node.natReachability.Store(int32(e.Reachability))
+						node.SendEvent(types.EventNATStatus, map[string]interface{}{
+							"reachability": e.Reachability.String(),
+							"relay_addr":   node.HasRelayAddr(),
+							"timestamp":    time.Now(),
+						})
+					case event.EvtLocalAddressesUpdated:
+						hasRelay := checkForRelayAddrs(h.Addrs())
+						node.hasRelayAddr.Store(hasRelay)
+						node.SendEvent(types.EventNATStatus, map[string]interface{}{
+							"reachability": network.Reachability(node.natReachability.Load()).String(),
+							"relay_addr":   hasRelay,
+							"relay_addrs":  getRelayAddrs(h.Addrs()),
+							"timestamp":    time.Now(),
+						})
+					}
+				}
+			}()
+		}
+	}
+
+	// Start DHT readiness monitoring goroutine
+	if kademliaDHT != nil {
+		go func() {
+			ticker := time.NewTicker(2 * time.Second)
+			defer ticker.Stop()
+			timeout := time.After(5 * time.Minute)
+			for {
+				select {
+				case <-ticker.C:
+					if kademliaDHT.RoutingTable().Size() > 0 {
+						node.dhtReady.Store(true)
+						node.SendEvent(types.EventNATStatus, map[string]interface{}{
+							"dht_ready":    true,
+							"routing_size": kademliaDHT.RoutingTable().Size(),
+							"timestamp":    time.Now(),
+						})
+						return
+					}
+				case <-timeout:
+					return
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+
 	// Multi-service beacons will be loaded in Start() via services loader
 
 	// Set up connection handlers
@@ -378,6 +472,58 @@ func (n *Node) SendEvent(eventType string, data interface{}) {
 		}
 		n.httpServer.BroadcastEvent(event)
 	}
+}
+
+// GetNATReachability returns the current NAT reachability status as a string.
+func (n *Node) GetNATReachability() string {
+	return network.Reachability(n.natReachability.Load()).String()
+}
+
+// HasRelayAddr returns true if the node has at least one relay address.
+func (n *Node) HasRelayAddr() bool {
+	return n.hasRelayAddr.Load()
+}
+
+// GetRelayAddrs returns the list of relay (/p2p-circuit) addresses as strings.
+func (n *Node) GetRelayAddrs() []string {
+	return getRelayAddrs(n.host.Addrs())
+}
+
+// IsDHTReady returns true if the DHT routing table has at least one peer.
+func (n *Node) IsDHTReady() bool {
+	return n.dhtReady.Load()
+}
+
+// GetDHTRoutingTableSize returns the number of peers in the DHT routing table.
+func (n *Node) GetDHTRoutingTableSize() int {
+	if n.dht == nil {
+		return 0
+	}
+	return n.dht.RoutingTable().Size()
+}
+
+// IsNATTraversalEnabled returns whether NAT traversal is configured.
+func (n *Node) IsNATTraversalEnabled() bool {
+	return n.config.NATTraversal != nil && *n.config.NATTraversal
+}
+
+func checkForRelayAddrs(addrs []multiaddr.Multiaddr) bool {
+	for _, addr := range addrs {
+		if strings.Contains(addr.String(), "/p2p-circuit") {
+			return true
+		}
+	}
+	return false
+}
+
+func getRelayAddrs(addrs []multiaddr.Multiaddr) []string {
+	var result []string
+	for _, addr := range addrs {
+		if strings.Contains(addr.String(), "/p2p-circuit") {
+			result = append(result, addr.String())
+		}
+	}
+	return result
 }
 
 // handleGossipMessages handles incoming gossip messages
