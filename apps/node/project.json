@@ -57,6 +57,15 @@
         "cwd": "apps/node",
         "command": "go mod tidy"
       }
+    },
+    "docs": {
+      "executor": "nx:run-commands",
+      "inputs": ["go"],
+      "outputs": ["{projectRoot}/docs/generated"],
+      "options": {
+        "cwd": "apps/node",
+        "command": "gomarkdoc --output docs/generated/%s.md ./..."
+      }
     }
   }
 }

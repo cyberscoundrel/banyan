@@ -27,6 +27,10 @@ module.exports = (env, argv) => {
           test: /\.css$/i,
           use: ['style-loader', 'css-loader', 'postcss-loader'],
         },
+        {
+          test: /\.md$/,
+          type: 'asset/source',
+        },
       ],
     },
     plugins: [

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import DocsAPI from './DocsAPI';
+import PackageDoc from './PackageDoc';
 
 const DocsHome: React.FC = () => {
   return (
@@ -85,6 +86,7 @@ const Docs: React.FC = () => {
     <Routes>
       <Route index element={<DocsHome />} />
       <Route path="api" element={<DocsAPI />} />
+      <Route path="api/*" element={<PackageDoc />} />
       <Route path="*" element={<DocsHome />} />
     </Routes>
   );
