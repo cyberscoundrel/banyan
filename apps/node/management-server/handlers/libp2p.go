@@ -16,7 +16,8 @@ import (
 	"banyan/types"
 )
 
-// LibP2PHandlers provides LibP2P-specific HTTP endpoint handlers
+// LibP2PHandlers provides HTTP endpoint handlers for libp2p-specific operations
+// including node status, connection management, and peer connectivity.
 type LibP2PHandlers struct {
 	node *nodePkg.Node
 }
@@ -28,7 +29,8 @@ func NewLibP2PHandlers(node *nodePkg.Node) *LibP2PHandlers {
 	}
 }
 
-// HandleStatus gets the status directly from the libp2p node
+// HandleStatus handles the /node/status endpoint to return the current status
+// of the libp2p node including peer counts, connection types, NAT status, and DHT status.
 func (lh *LibP2PHandlers) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	if lh.node == nil {
 		http.Error(w, "LibP2P node not available", http.StatusServiceUnavailable)
@@ -85,7 +87,9 @@ func (lh *LibP2PHandlers) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Served libp2p status: %s %s", r.Method, r.URL.Path)
 }
 
-// HandleConnections gets the connections directly from the libp2p node
+// HandleConnections handles the /network/connections endpoint to return
+// information about all tracked peer connections including status, HTTP capability,
+// and connection type.
 func (lh *LibP2PHandlers) HandleConnections(w http.ResponseWriter, r *http.Request) {
 	if lh.node == nil {
 		http.Error(w, "LibP2P node not available", http.StatusServiceUnavailable)
@@ -136,7 +140,8 @@ func (lh *LibP2PHandlers) HandleConnections(w http.ResponseWriter, r *http.Reque
 	log.Printf("Served libp2p connections: %s %s", r.Method, r.URL.Path)
 }
 
-// HandleConnectToPeer connects to a peer via the libp2p node using the connection manager
+// HandleConnectToPeer handles the /network/connect/{peerID} endpoint to connect
+// to a peer by ID. It uses the connection manager which includes DHT lookup and tracking.
 func (lh *LibP2PHandlers) HandleConnectToPeer(w http.ResponseWriter, r *http.Request) {
 	if lh.node == nil {
 		http.Error(w, "LibP2P node not available", http.StatusServiceUnavailable)
@@ -190,7 +195,8 @@ func (lh *LibP2PHandlers) HandleConnectToPeer(w http.ResponseWriter, r *http.Req
 	log.Printf("Handled connect-to-peer request: %s %s for peer %s", r.Method, r.URL.Path, peerIDStr)
 }
 
-// HandleConnectWithMultiaddr connects to a peer using an explicit multiaddress
+// HandleConnectWithMultiaddr handles the /network/connect-multiaddr endpoint
+// to connect to a peer using an explicit multiaddress.
 // POST /network/connect-multiaddr
 // Body: {"peer_id": "12D3...", "multiaddr": "/ip4/127.0.0.1/tcp/9000"}
 func (lh *LibP2PHandlers) HandleConnectWithMultiaddr(w http.ResponseWriter, r *http.Request) {

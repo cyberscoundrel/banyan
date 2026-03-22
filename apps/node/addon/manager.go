@@ -1,3 +1,18 @@
+// Package addon provides lifecycle management for external addon processes.
+// It handles spawning addon executables, JSON-RPC 2.0 communication over stdin/stdout,
+// HTTP endpoint registration and forwarding, and alias resolution across multiple addons.
+//
+// The Manager loads addon configurations from an addons.json file and starts each
+// addon as a subprocess. Addons communicate with the host via JSON-RPC, registering
+// HTTP endpoints that can be mounted on local (management) or remote (p2p) servers.
+//
+// Example configuration (addons.json):
+//
+//	{
+//	  "addons": [
+//	    {"name": "echo", "exec": "./echo/echo-addon", "args": ["--foo", "bar"]}
+//	  ]
+//	}
 package addon
 
 import (
@@ -20,14 +35,6 @@ import (
 	"banyan/types"
 )
 
-// Config schema for addons directory
-// addons.json example:
-// {
-//   "addons": [
-//     {"name":"echo","exec":"./echo/echo-addon", "args":["--foo","bar"]}
-//   ]
-// }
-
 type addonsFile struct {
 	Addons []addonEntry `json:"addons"`
 }
@@ -38,6 +45,9 @@ type addonEntry struct {
 	Args []string `json:"args,omitempty"`
 }
 
+// Manager coordinates the lifecycle and communication of addon processes.
+// It spawns addon executables, handles JSON-RPC communication, registers HTTP
+// endpoints, and provides alias resolution across all running addons.
 type Manager struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -59,7 +69,8 @@ type Manager struct {
 	registeredHandlers map[string]*multiMethodHandler
 }
 
-// multiMethodHandler handles multiple HTTP methods for the same path
+// multiMethodHandler handles multiple HTTP methods for the same path.
+// It dispatches incoming requests to the appropriate addon based on the HTTP method.
 type multiMethodHandler struct {
 	basePath  string
 	paramName string
@@ -161,7 +172,8 @@ type registerEndpointParams struct {
 	Path   string `json:"path"`   // supports trailing {param}: e.g. /addons/x/{slug}
 }
 
-// NewManager constructs the addon manager
+// NewManager creates a new addon Manager with the given parent context and logger.
+// If logger is nil, a default logger using fmt.Printf is used.
 func NewManager(parent context.Context, logger func(format string, v ...interface{})) *Manager {
 	ctx, cancel := context.WithCancel(parent)
 	if logger == nil {
@@ -177,20 +189,21 @@ func NewManager(parent context.Context, logger func(format string, v ...interfac
 	}
 }
 
-// WithMounts wires the mount functions for local (management) and remote (libp2p) endpoints.
+// WithMounts configures the mount functions for local (management) and remote (p2p) HTTP endpoints.
+// The mgmt function mounts handlers on the management server; p2p mounts on the libp2p server.
 func (m *Manager) WithMounts(mgmt func(path string, h func(http.ResponseWriter, *http.Request)), p2p func(path string, h func(http.ResponseWriter, *http.Request))) *Manager {
 	m.mgmtMount = mgmt
 	m.p2pMount = p2p
 	return m
 }
 
-// WithDirectory overrides the addons directory location.
+// WithDirectory sets a custom addons directory location, overriding the default search path.
 func (m *Manager) WithDirectory(dir string) *Manager {
 	m.addonsDirOverride = dir
 	return m
 }
 
-// WithEnv adds an environment variable passed to all addon processes.
+// WithEnv adds an environment variable that will be passed to all spawned addon processes.
 func (m *Manager) WithEnv(key, value string) *Manager {
 	if m.extraEnv == nil {
 		m.extraEnv = make(map[string]string)
@@ -199,13 +212,13 @@ func (m *Manager) WithEnv(key, value string) *Manager {
 	return m
 }
 
-// WithManagerURL sets the management server base URL in env var BANYAN_MGMT_URL for addons.
+// WithManagerURL sets the management server base URL, exposed to addons via BANYAN_MGMT_URL.
 func (m *Manager) WithManagerURL(url string) *Manager {
 	return m.WithEnv("BANYAN_MGMT_URL", url)
 }
 
-// LoadAndStart loads addons.json from folder and starts addons.
-// Priority: explicit override (WithDirectory) > env BANYAN_ADDONS_DIR > default next to executable.
+// LoadAndStart reads addons.json from the configured directory and starts all addon processes.
+// Directory priority: WithDirectory override > BANYAN_ADDONS_DIR env > executable's directory/addons.
 func (m *Manager) LoadAndStart() error {
 	addonsDir, err := m.effectiveAddonsDir()
 	if err != nil {
@@ -452,7 +465,8 @@ func (m *Manager) handleAddonRequest(p *addonProcess, req *rpcRequest) {
 	}
 }
 
-// DisclosureProvider returns a function that yields current addon disclosures.
+// DisclosureProvider returns a function that yields the current list of addon disclosures.
+// Each addon may disclose its name, version, and metadata to be included in host greetings.
 func (m *Manager) DisclosureProvider() func() []types.AddonDisclosure {
 	return func() []types.AddonDisclosure {
 		m.disclosuresMu.RLock()
@@ -578,9 +592,8 @@ func (m *Manager) call(name, method string, params interface{}, out interface{})
 	return nil
 }
 
-// callWithTimeout issues a JSON-RPC call to a specific addon and waits until either
-// a response is received or the context is done. On context cancellation, the pending
-// waiter is removed and a context error is returned.
+// callWithTimeout issues a JSON-RPC call to an addon and waits for a response or context cancellation.
+// On timeout, the pending waiter is cleaned up and ctx.Err() is returned.
 func (m *Manager) callWithTimeout(ctx context.Context, name, method string, params interface{}, out interface{}) error {
 	p := m.getProc(name)
 	if p == nil {
@@ -622,9 +635,8 @@ func (m *Manager) callWithTimeout(ctx context.Context, name, method string, para
 	}
 }
 
-// ResolveAliasFirst concurrently invokes alias resolution on all running addons.
-// It returns the first successful result (path or json). If the context expires,
-// it returns an error and cancels any outstanding waits.
+// ResolveAliasFirst queries all addons in parallel and returns the first successful alias resolution.
+// Returns the resolved path or raw JSON string. Context cancellation aborts pending queries.
 func (m *Manager) ResolveAliasFirst(ctx context.Context, alias string) (path string, rawJSON string, err error) {
 	m.procsMu.RLock()
 	names := make([]string, 0, len(m.procs))
@@ -688,9 +700,9 @@ func (m *Manager) ResolveAliasFirst(ctx context.Context, alias string) (path str
 	return "", "", lastErr
 }
 
-// ResolveAlias resolves an alias either from a specific addon (when desiredAddon is non-empty)
-// or from the first addon that returns a result. It also returns the addon name that produced
-// the result to enable callers to attribute cached alias results.
+// ResolveAlias resolves an alias to a path or JSON, optionally from a specific addon.
+// If desiredAddon is empty, all addons are queried in parallel and the first success is returned.
+// Returns the addon name that produced the result for caller attribution.
 func (m *Manager) ResolveAlias(ctx context.Context, alias string, desiredAddon string) (path string, rawJSON string, addonName string, err error) {
 	m.procsMu.RLock()
 	names := make([]string, 0, len(m.procs))

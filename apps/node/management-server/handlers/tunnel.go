@@ -17,7 +17,8 @@ import (
 	tunnelPkg "banyan/tunnel"
 )
 
-// TunnelHandlers handles tunnel-related API endpoints
+// TunnelHandlers provides HTTP endpoint handlers for TCP tunnel management.
+// Tunnels allow forwarding local TCP connections through libp2p to remote peers.
 type TunnelHandlers struct {
 	node          *nodePkg.Node
 	activeTunnels sync.Map // map[uint64]*activeTunnel
@@ -32,7 +33,7 @@ type activeTunnel struct {
 	port     uint16
 }
 
-// NewTunnelHandlers creates tunnel handlers
+// NewTunnelHandlers creates a new TunnelHandlers instance for managing TCP tunnels.
 func NewTunnelHandlers(node *nodePkg.Node) *TunnelHandlers {
 	return &TunnelHandlers{
 		node: node,
@@ -71,7 +72,9 @@ func (th *TunnelHandlers) checkAuth(w http.ResponseWriter, r *http.Request) bool
 	return false
 }
 
-// HandleOpenTunnel opens a TCP tunnel to a peer
+// HandleOpenTunnel handles the /tunnel/open endpoint to create a TCP tunnel
+// to a remote peer. The tunnel forwards local connections to a target host/port
+// on the peer's machine.
 // POST /tunnel/open
 // Body: {"peer_id": "12D3...", "target_host": "localhost", "target_port": 8080}
 // Returns: {"tunnel_id": 1, "local_port": 54321}
@@ -192,7 +195,8 @@ func (th *TunnelHandlers) acceptTunnelConnections(tunnel *activeTunnel, tunnelHa
 	}
 }
 
-// HandleCloseTunnel closes an active tunnel
+// HandleCloseTunnel handles the /tunnel/close/{id} endpoint to close an active
+// TCP tunnel by its ID.
 // DELETE /tunnel/close/{id}
 func (th *TunnelHandlers) HandleCloseTunnel(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
@@ -231,7 +235,8 @@ func (th *TunnelHandlers) HandleCloseTunnel(w http.ResponseWriter, r *http.Reque
 	})
 }
 
-// HandleListTunnels lists active tunnels
+// HandleListTunnels handles the /tunnel/list endpoint to list all active
+// TCP tunnels with their local ports and target information.
 // GET /tunnel/list
 func (th *TunnelHandlers) HandleListTunnels(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {

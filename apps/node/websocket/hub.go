@@ -1,3 +1,20 @@
+// Package websocket provides a WebSocket hub for real-time event broadcasting
+// to connected clients.
+//
+// The hub maintains a registry of active WebSocket connections and provides
+// a thread-safe mechanism for broadcasting events to all connected clients.
+// It handles client registration, unregistration, and message distribution
+// through channel-based communication.
+//
+// The package implements the interfaces.WebSocketHub interface and is designed
+// to be used with the gorilla/websocket library for handling WebSocket
+// connections in HTTP servers.
+//
+// Example usage:
+//
+//	hub := NewHub()
+//	go hub.Run()
+//	hub.BroadcastEvent(event)
 package websocket
 
 import (
@@ -12,7 +29,10 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Client represents a WebSocket client connection
+// Client represents a connected WebSocket client.
+// It wraps a gorilla/websocket connection and provides channels for
+// sending events back to the client. Each client has a unique identifier
+// and is managed by a Hub instance.
 type Client struct {
 	conn *websocket.Conn
 	send chan types.Event
@@ -20,7 +40,10 @@ type Client struct {
 	id   string
 }
 
-// Hub maintains the set of active clients and broadcasts events to them
+// Hub maintains the set of active WebSocket clients and broadcasts events to them.
+// It provides thread-safe client management through channel-based operations,
+// allowing concurrent registration, unregistration, and broadcasting.
+// The Hub should be started with Run() before accepting connections.
 type Hub struct {
 	clients    map[*Client]bool
 	broadcast  chan types.Event
@@ -29,7 +52,9 @@ type Hub struct {
 	mutex      sync.RWMutex
 }
 
-// NewHub creates a new WebSocket hub
+// NewHub creates and returns a new WebSocket hub instance.
+// The returned hub implements interfaces.WebSocketHub and must be
+// started with Run() in a separate goroutine before use.
 func NewHub() interfaces.WebSocketHub {
 	return &Hub{
 		clients:    make(map[*Client]bool),
@@ -39,7 +64,9 @@ func NewHub() interfaces.WebSocketHub {
 	}
 }
 
-// Run starts the hub's main loop for managing clients and broadcasting events
+// Run starts the hub's main event loop. This method blocks indefinitely
+// and should be invoked in a separate goroutine. It handles client
+// registration, unregistration, and broadcasts events to all connected clients.
 func (h *Hub) Run() {
 	for {
 		select {
@@ -73,12 +100,15 @@ func (h *Hub) Run() {
 	}
 }
 
-// BroadcastEvent sends an event to all connected WebSocket clients
+// BroadcastEvent queues an event to be sent to all connected WebSocket clients.
+// The event is sent asynchronously through the hub's broadcast channel.
 func (h *Hub) BroadcastEvent(event types.Event) {
 	h.broadcast <- event
 }
 
-// NewClient creates a new WebSocket client
+// NewClient creates a new Client from a WebSocket connection.
+// The connection must be a *gorilla/websocket.Conn. The client is assigned
+// a unique identifier but is not automatically registered with the hub.
 func (h *Hub) NewClient(conn interface{}) interfaces.WebSocketClient {
 	wsConn := conn.(*websocket.Conn)
 	clientID := fmt.Sprintf("client-%d", time.Now().UnixNano())
@@ -91,27 +121,31 @@ func (h *Hub) NewClient(conn interface{}) interfaces.WebSocketClient {
 	return client
 }
 
-// Register registers a client with the hub
+// Register adds a client to the hub for event broadcasting.
+// The client will receive all events broadcast to the hub until unregistered.
 func (h *Hub) Register(client interfaces.WebSocketClient) {
 	h.register <- client.(*Client)
 }
 
-// Unregister unregisters a client from the hub
+// Unregister removes a client from the hub and closes its send channel.
+// After unregistration, the client will no longer receive broadcast events.
 func (h *Hub) Unregister(client interfaces.WebSocketClient) {
 	h.unregister <- client.(*Client)
 }
 
-// GetID returns the client's ID
+// GetID returns the unique identifier assigned to this client.
 func (c *Client) GetID() string {
 	return c.id
 }
 
-// GetSendChannel returns the client's send channel
+// GetSendChannel returns the channel used to send events to this client.
+// Events written to this channel will be forwarded to the WebSocket connection.
 func (c *Client) GetSendChannel() chan types.Event {
 	return c.send
 }
 
-// GetConnection returns the client's WebSocket connection
+// GetConnection returns the underlying WebSocket connection as an interface{}.
+// The caller should type assert to *gorilla/websocket.Conn for usage.
 func (c *Client) GetConnection() interface{} {
 	return c.conn
 }

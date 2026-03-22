@@ -1,3 +1,14 @@
+// Command node is the main entry point for running a Banyan network node.
+// It initializes a libp2p-based peer-to-peer node with service discovery,
+// HTTP proxy capabilities, and a management API server.
+//
+// Usage:
+//
+//	node [flags]
+//
+// Configuration can be provided via command-line flags or a JSON config file
+// specified with the -config flag. Command-line flags take precedence over
+// config file values.
 package main
 
 import (
@@ -19,14 +30,20 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 )
 
-// BootstrapsValue can be either a string (file path) or an array of strings (inline multiaddrs)
+// BootstrapsValue represents bootstrap peer configuration that can be either
+// a file path (string) or an inline array of multiaddr strings.
 type BootstrapsValue struct {
+	// IsFile indicates whether Path contains a file path (true) or Addrs contains inline addresses (false).
 	IsFile bool
-	Path   string
-	Addrs  []string
+	// Path is the file path to a JSON file containing bootstrap peer multiaddrs.
+	Path string
+	// Addrs is an inline array of bootstrap peer multiaddr strings.
+	Addrs []string
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for BootstrapsValue
+// UnmarshalJSON implements custom JSON unmarshaling for BootstrapsValue.
+// It accepts either a string (interpreted as a file path) or an array of
+// strings (interpreted as inline multiaddrs).
 func (b *BootstrapsValue) UnmarshalJSON(data []byte) error {
 	// Try to unmarshal as string (file path)
 	var path string
@@ -47,33 +64,55 @@ func (b *BootstrapsValue) UnmarshalJSON(data []byte) error {
 	return fmt.Errorf("bootstraps must be either a string (file path) or an array of strings (multiaddrs)")
 }
 
-// NodeConfigFile represents the JSON configuration file structure
+// NodeConfigFile represents the JSON structure of the node configuration file.
+// All fields are optional and map to corresponding command-line flags.
 type NodeConfigFile struct {
-	PrivKeyFile                      *string          `json:"privkey,omitempty"`
-	DisableDHT                       *bool            `json:"disableDht,omitempty"`
-	ServicesDir                      *string          `json:"servicesDir,omitempty"`
-	FigsDir                          *string          `json:"figsDir,omitempty"`
-	NoAnnounce                       *bool            `json:"noAnnounce,omitempty"`
-	AnonLookups                      *bool            `json:"anonLookups,omitempty"`
-	ListenMultiaddr                  *string          `json:"listen,omitempty"`
-	NoCrypto                         *bool            `json:"noCrypto,omitempty"`
-	NATTraversal                     *bool            `json:"natTraversal,omitempty"`
-	KuboURL                          *string          `json:"kuboUrl,omitempty"`
-	RouterConfig                     *string          `json:"routerConfig,omitempty"`
-	AddonsDir                        *string          `json:"addonsDir,omitempty"`
-	BeaconIncludePeerIDAnnouncements *bool            `json:"beaconIncludePeerIdAnnouncements,omitempty"`
-	BeaconPeerIDDirectOnly           *bool            `json:"beaconPeerIdDirectOnly,omitempty"`
-	AllowExpiredFigs                 *bool            `json:"allowExpiredFigs,omitempty"`
-	AllowInsecureFigs                *bool            `json:"allowInsecureFigs,omitempty"`
-	OverrideTransportRestrictions    *bool            `json:"overrideTransportRestrictions,omitempty"`
-	Bootstraps                       *BootstrapsValue `json:"bootstraps,omitempty"` // Optional bootstrap peer multiaddrs (inline array or file path)
-	// Tunnel configuration
-	TunnelEnabled        *bool    `json:"tunnelEnabled,omitempty"`        // Enable TCP tunnel protocol handler
-	TunnelAuthToken      *string  `json:"tunnelAuthToken,omitempty"`      // Auth token required for tunnel API
-	TunnelAllowedTargets []string `json:"tunnelAllowedTargets,omitempty"` // Allowed target hosts for outbound tunnels
+	// PrivKeyFile is the path to a PEM file containing the node's private key.
+	PrivKeyFile *string `json:"privkey,omitempty"`
+	// DisableDHT disables DHT peer discovery when true.
+	DisableDHT *bool `json:"disableDht,omitempty"`
+	// ServicesDir is the directory containing services.json.
+	ServicesDir *string `json:"servicesDir,omitempty"`
+	// FigsDir is the directory containing fig files.
+	FigsDir *string `json:"figsDir,omitempty"`
+	// NoAnnounce prevents DHT and pubsub announcements when true.
+	NoAnnounce *bool `json:"noAnnounce,omitempty"`
+	// AnonLookups allows anonymous lookups when true.
+	AnonLookups *bool `json:"anonLookups,omitempty"`
+	// ListenMultiaddr is the multiaddr to listen on.
+	ListenMultiaddr *string `json:"listen,omitempty"`
+	// NoCrypto disables encryption on pubsub messages when true.
+	NoCrypto *bool `json:"noCrypto,omitempty"`
+	// NATTraversal enables NAT traversal features when true.
+	NATTraversal *bool `json:"natTraversal,omitempty"`
+	// KuboURL is the URL of a Kubo node to connect to.
+	KuboURL *string `json:"kuboUrl,omitempty"`
+	// RouterConfig is the path to a JSON router configuration file.
+	RouterConfig *string `json:"routerConfig,omitempty"`
+	// AddonsDir is the directory containing addons.
+	AddonsDir *string `json:"addonsDir,omitempty"`
+	// BeaconIncludePeerIDAnnouncements includes PeerID in public announcements.
+	BeaconIncludePeerIDAnnouncements *bool `json:"beaconIncludePeerIdAnnouncements,omitempty"`
+	// BeaconPeerIDDirectOnly only includes PeerID in direct replies.
+	BeaconPeerIDDirectOnly *bool `json:"beaconPeerIdDirectOnly,omitempty"`
+	// AllowExpiredFigs allows expired fig files (security risk).
+	AllowExpiredFigs *bool `json:"allowExpiredFigs,omitempty"`
+	// AllowInsecureFigs allows insecure fig files (security risk).
+	AllowInsecureFigs *bool `json:"allowInsecureFigs,omitempty"`
+	// OverrideTransportRestrictions bypasses transport restrictions.
+	OverrideTransportRestrictions *bool `json:"overrideTransportRestrictions,omitempty"`
+	// Bootstraps specifies bootstrap peers (file path or inline array).
+	Bootstraps *BootstrapsValue `json:"bootstraps,omitempty"`
+	// TunnelEnabled enables the TCP tunnel protocol handler.
+	TunnelEnabled *bool `json:"tunnelEnabled,omitempty"`
+	// TunnelAuthToken is the auth token for tunnel API endpoints.
+	TunnelAuthToken *string `json:"tunnelAuthToken,omitempty"`
+	// TunnelAllowedTargets specifies allowed target hosts for tunnels.
+	TunnelAllowedTargets []string `json:"tunnelAllowedTargets,omitempty"`
 }
 
-// Command line flags
+// Command line flags for node configuration.
+// These can be overridden by a config file; CLI flags take precedence.
 var (
 	configFile      = flag.String("config", "", "Path to JSON configuration file")
 	privKeyFile     = flag.String("privkey", "", "Path to PEM file containing private key for peer identity and AES encryption")
@@ -101,6 +140,9 @@ var (
 	tunnelAuthToken = flag.String("tunnel-auth-token", "", "Auth token required for tunnel API endpoints (optional)")
 )
 
+// main is the entry point for the Banyan node.
+// It loads configuration, creates and starts the node, initializes the management
+// API server, and runs until interrupted.
 func main() {
 	flag.Parse()
 
@@ -187,7 +229,9 @@ func main() {
 	select {}
 }
 
-// loadPrivateKeyFromPEM loads a private key from a PEM file
+// loadPrivateKeyFromPEM loads a private key from a PEM file.
+// It supports EC PRIVATE KEY, PRIVATE KEY (PKCS8), and RSA PRIVATE KEY blocks.
+// The key is converted to a libp2p-compatible format.
 func loadPrivateKeyFromPEM(filename string) (crypto.PrivKey, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -230,7 +274,9 @@ func loadPrivateKeyFromPEM(filename string) (crypto.PrivKey, error) {
 	return privKey, nil
 }
 
-// loadBootstraps loads bootstrap peer multiaddrs from either inline array or file
+// loadBootstraps loads bootstrap peer multiaddrs from either an inline array
+// or a file path specified in BootstrapsValue. Returns nil if no bootstraps
+// are configured.
 func loadBootstraps(bootstrapsValue *BootstrapsValue) ([]string, error) {
 	if bootstrapsValue == nil {
 		return nil, nil
@@ -259,8 +305,9 @@ func loadBootstraps(bootstrapsValue *BootstrapsValue) ([]string, error) {
 	return bootstrapsValue.Addrs, nil
 }
 
-// loadConfig loads configuration from file (if provided) and merges with command-line flags.
-// Command-line flags take precedence over config file values.
+// loadConfig loads configuration from a file (if provided) and merges with
+// command-line flags. Command-line flags take precedence over config file values.
+// Returns a node.Config ready for use with NewNode.
 func loadConfig() (*nodePkg.Config, error) {
 	var fileConfig NodeConfigFile
 
