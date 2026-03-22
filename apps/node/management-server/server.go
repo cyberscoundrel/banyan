@@ -1,3 +1,10 @@
+// Package managementserver provides an HTTP management API server for Banyan nodes.
+// It exposes REST endpoints for node management, peer connections, service discovery,
+// proxying, tunneling, and real-time event streaming via WebSockets.
+//
+// The server is started using StartManagementServer which returns a ManagementServer
+// instance and the server URL. All endpoints support CORS for cross-origin requests
+// from web-based management interfaces.
 package managementserver
 
 import (
@@ -14,7 +21,8 @@ import (
 	"banyan/websocket"
 )
 
-// corsMiddleware adds CORS headers to allow WebUI cross-origin requests
+// corsMiddleware is an HTTP middleware that adds CORS headers to allow
+// cross-origin requests from web-based management interfaces.
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")

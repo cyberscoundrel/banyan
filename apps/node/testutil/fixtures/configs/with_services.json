@@ -1,0 +1,6 @@
+{
+  "listen": "/ip4/127.0.0.1/tcp/0",
+  "disableDht": true,
+  "noCrypto": false,
+  "servicesDir": "./testutil/fixtures/keys"
+}

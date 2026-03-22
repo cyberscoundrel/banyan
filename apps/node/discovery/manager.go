@@ -1,3 +1,11 @@
+// Package discovery provides peer discovery mechanisms for the Banyan network.
+// It implements multiple discovery strategies including Distributed Hash Table
+// (DHT) for wide-area peer discovery, mDNS for local network discovery, and
+// GossipSub-based lookup requests for finding specific peers.
+//
+// The package handles peer lookup requests and responses over the gossip network,
+// supports encrypted peer identity exchange, and integrates with the connection
+// manager to establish connections to discovered peers.
 package discovery
 
 import (
@@ -26,7 +34,10 @@ const (
 	GossipSubTopic = types.GossipSubTopic
 )
 
-// Manager handles peer discovery mechanisms
+// Manager coordinates peer discovery using multiple mechanisms. It manages
+// DHT-based discovery for finding peers in the wider network, mDNS for local
+// network discovery, and GossipSub messaging for peer lookup requests. The
+// manager also handles event broadcasting for discovery-related notifications.
 type Manager struct {
 	host             host.Host
 	ctx              context.Context
@@ -39,7 +50,11 @@ type Manager struct {
 	httpTransport    *http.Transport
 }
 
-// NewManager creates a new discovery manager
+// NewManager creates a new discovery manager with the given libp2p host,
+// context, DHT instance, pubsub system, event broadcaster, and configuration
+// options. If disableDHT is true, DHT-based discovery is skipped. If noCrypto
+// is true, encryption is disabled for lookup responses. If anonLookups is
+// false, anonymous lookup requests are ignored.
 func NewManager(host host.Host, ctx context.Context, dht *dht.IpfsDHT, pubsub *pubsub.PubSub, eventBroadcaster interfaces.EventBroadcaster, disableDHT bool, noCrypto bool, anonLookups bool, httpTransport *http.Transport) interfaces.DiscoveryManager {
 	return &Manager{
 		host:             host,
@@ -54,14 +69,16 @@ func NewManager(host host.Host, ctx context.Context, dht *dht.IpfsDHT, pubsub *p
 	}
 }
 
-// sendEvent sends an event via the event broadcaster
+// sendEvent sends an event via the event broadcaster if one is configured.
 func (m *Manager) sendEvent(eventType string, data interface{}) {
 	if m.eventBroadcaster != nil {
 		m.eventBroadcaster.SendEvent(eventType, data)
 	}
 }
 
-// StartPeerDiscovery starts all peer discovery mechanisms
+// StartPeerDiscovery initializes all enabled peer discovery mechanisms.
+// It starts DHT bootstrap and discovery (if enabled) and mDNS discovery.
+// The connectionManager is used to add discovered peers to tracking.
 func (m *Manager) StartPeerDiscovery(connectionManager interfaces.PeerManager) {
 	if m.disableDHT {
 		m.sendEvent(types.EventInfo, map[string]interface{}{
@@ -89,7 +106,10 @@ func (m *Manager) StartPeerDiscovery(connectionManager interfaces.PeerManager) {
 	go m.StartMDNSDiscovery(connectionManager)
 }
 
-// StartDHTDiscovery starts DHT-based peer discovery
+// StartDHTDiscovery starts periodic DHT-based peer discovery. It advertises
+// the node's presence on the GossipSub topic and periodically searches for
+// other peers advertising on the same topic, attempting to connect to any
+// discovered peers.
 func (m *Manager) StartDHTDiscovery() {
 	routingDiscovery := drouting.NewRoutingDiscovery(m.dht)
 	dutil.Advertise(m.ctx, routingDiscovery, GossipSubTopic)
@@ -137,7 +157,8 @@ func (m *Manager) StartDHTDiscovery() {
 	}
 }
 
-// peerDiscoveryNotifee handles mDNS peer discovery notifications
+// peerDiscoveryNotifee implements the mDNS notification interface for
+// receiving peer discovery events.
 type peerDiscoveryNotifee struct {
 	PeerChan          chan peer.AddrInfo
 	discoveryManager  *Manager
@@ -148,7 +169,9 @@ func (n *peerDiscoveryNotifee) HandlePeerFound(pi peer.AddrInfo) {
 	n.PeerChan <- pi
 }
 
-// StartMDNSDiscovery starts mDNS-based peer discovery
+// StartMDNSDiscovery starts mDNS-based local network peer discovery.
+// Discovered peers are automatically connected and added to the connection
+// manager as background connections.
 func (m *Manager) StartMDNSDiscovery(connectionManager interfaces.PeerManager) {
 	notifee := &peerDiscoveryNotifee{
 		PeerChan:          make(chan peer.AddrInfo),
@@ -198,12 +221,12 @@ func (m *Manager) StartMDNSDiscovery(connectionManager interfaces.PeerManager) {
 	}
 }
 
-// IsDHTEnabled returns whether DHT is enabled
+// IsDHTEnabled returns whether DHT-based discovery is enabled.
 func (m *Manager) IsDHTEnabled() bool {
 	return !m.disableDHT
 }
 
-// GetDiscoveryMethods returns the list of active discovery methods
+// GetDiscoveryMethods returns a list of currently active discovery method names.
 func (m *Manager) GetDiscoveryMethods() []string {
 	methods := []string{"mDNS"}
 	if !m.disableDHT {
@@ -212,13 +235,16 @@ func (m *Manager) GetDiscoveryMethods() []string {
 	return methods
 }
 
-// HandleGossipMessages handles incoming gossip messages for peer discovery
+// HandleGossipMessages is a placeholder for gossip message handling setup.
+// Actual message processing is delegated to ProcessGossipMessage.
 func (m *Manager) HandleGossipMessages(cryptoManager interfaces.CryptoManager, connectionManager interfaces.PeerManager) {
 	// This would typically be called from the main gossip subscription handler
 	// The actual message processing is done in ProcessGossipMessage
 }
 
-// ProcessGossipMessage processes a single gossip message
+// ProcessGossipMessage processes a single gossip message for peer discovery.
+// It handles lookup requests and responses, decrypting encrypted data if
+// necessary and establishing connections to discovered peers.
 func (m *Manager) ProcessGossipMessage(msg *pubsub.Message, cryptoManager interfaces.CryptoManager, connectionManager interfaces.PeerManager) {
 	// Try to parse as lookup request first
 	var lookupReq types.LookupRequest
@@ -263,7 +289,10 @@ func (m *Manager) ProcessGossipMessage(msg *pubsub.Message, cryptoManager interf
 	})
 }
 
-// HandleLookupRequest handles incoming lookup requests
+// HandleLookupRequest processes incoming peer lookup requests from the
+// gossip network. It validates the request, optionally checks for anonymous
+// lookup restrictions, and sends a response containing the peer's public key
+// and optionally encrypted peer ID back to the requester.
 func (m *Manager) HandleLookupRequest(req *types.LookupRequest, from peer.ID, cryptoManager interfaces.CryptoManager, connectionManager interfaces.PeerManager) {
 	m.sendEvent(types.EventGossipMessage, map[string]interface{}{
 		"message": "Received lookup request",
@@ -332,7 +361,8 @@ func (m *Manager) HandleLookupRequest(req *types.LookupRequest, from peer.ID, cr
 	}
 }
 
-// SendDirectResponse sends a response directly to a peer
+// SendDirectResponse sends a lookup response directly to a specific peer
+// using libp2p HTTP transport to the peer's /discovery/response endpoint.
 func (m *Manager) SendDirectResponse(peerID peer.ID, response *types.LookupResponse) {
 	// Send via libp2p HTTP to the peer's protocol server
 	responseData, err := json.Marshal(response)
@@ -375,7 +405,9 @@ func (m *Manager) SendDirectResponse(peerID peer.ID, response *types.LookupRespo
 	}
 }
 
-// ProcessLookupResponse processes lookup responses
+// ProcessLookupResponse processes a lookup response received from another
+// peer. It verifies the response signature if present and attempts to connect
+// to the responding peer via the connection manager.
 func (m *Manager) ProcessLookupResponse(resp *types.LookupResponse, connectionManager interfaces.PeerManager) {
 	m.sendEvent(types.EventGossipMessage, map[string]interface{}{
 		"message": "Received lookup response",
@@ -401,7 +433,9 @@ func (m *Manager) ProcessLookupResponse(resp *types.LookupResponse, connectionMa
 	}
 }
 
-// VerifyResponseSignature verifies the signature of a lookup response
+// VerifyResponseSignature verifies the cryptographic signature of a lookup
+// response to ensure it was sent by the claimed peer. Returns true if the
+// signature is valid, false otherwise.
 func (m *Manager) VerifyResponseSignature(resp *types.LookupResponse) bool {
 	if len(resp.PublicKey) == 0 || len(resp.Signature) == 0 {
 		return false

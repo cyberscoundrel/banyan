@@ -8,7 +8,8 @@ import (
 	nodePkg "banyan/node"
 )
 
-// RouterHandlers provides router management HTTP endpoint handlers
+// RouterHandlers provides HTTP endpoint handlers for URL route management.
+// Routes map identifiers to URLs for custom proxy configurations.
 type RouterHandlers struct {
 	node *nodePkg.Node
 }
@@ -20,13 +21,14 @@ func NewRouterHandlers(node *nodePkg.Node) *RouterHandlers {
 	}
 }
 
-// RouteRequest represents a request to add or update a route
+// RouteRequest represents a request body for adding or updating a URL route.
 type RouteRequest struct {
 	Identifier string `json:"identifier"`
 	URL        string `json:"url"`
 }
 
-// HandleAddRoute adds or updates a route in the routing table
+// HandleAddRoute handles the /router/add endpoint to add or update a URL route
+// mapping in the routing table.
 func (rh *RouterHandlers) HandleAddRoute(w http.ResponseWriter, r *http.Request) {
 	if rh.node == nil {
 		http.Error(w, "Node not available", http.StatusServiceUnavailable)
@@ -73,7 +75,8 @@ func (rh *RouterHandlers) HandleAddRoute(w http.ResponseWriter, r *http.Request)
 	log.Printf("Added route: %s -> %s", request.Identifier, request.URL)
 }
 
-// HandleGetRoutes returns all current routes
+// HandleGetRoutes handles the /router/list endpoint to return all current
+// URL route mappings from the routing table.
 func (rh *RouterHandlers) HandleGetRoutes(w http.ResponseWriter, r *http.Request) {
 	if rh.node == nil {
 		http.Error(w, "Node not available", http.StatusServiceUnavailable)

@@ -154,3 +154,161 @@ func TestTunnelTargetDenied(t *testing.T) {
 	}
 }
 
+func TestTunnelConcurrentStreams(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	h1, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
+	if err != nil {
+		t.Fatalf("Failed to create host1: %v", err)
+	}
+	defer h1.Close()
+
+	h2, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
+	if err != nil {
+		t.Fatalf("Failed to create host2: %v", err)
+	}
+	defer h2.Close()
+
+	h1.Peerstore().AddAddrs(h2.ID(), h2.Addrs(), time.Hour)
+	if err := h1.Connect(ctx, peer.AddrInfo{ID: h2.ID(), Addrs: h2.Addrs()}); err != nil {
+		t.Fatalf("Failed to connect hosts: %v", err)
+	}
+
+	handler1 := NewHandler(h1, ctx, nil)
+	NewHandler(h2, ctx, nil)
+
+	echoListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to start echo server: %v", err)
+	}
+	defer echoListener.Close()
+	echoPort := echoListener.Addr().(*net.TCPAddr).Port
+
+	go func() {
+		for {
+			conn, err := echoListener.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				io.Copy(c, c)
+			}(conn)
+		}
+	}()
+
+	numStreams := 5
+	errChan := make(chan error, numStreams)
+
+	for i := 0; i < numStreams; i++ {
+		go func(idx int) {
+			stream, err := handler1.OpenTunnel(h2.ID(), "127.0.0.1", uint16(echoPort))
+			if err != nil {
+				errChan <- fmt.Errorf("stream %d: failed to open: %w", idx, err)
+				return
+			}
+			defer stream.Close()
+
+			testData := fmt.Appendf(nil, "Stream %d data", idx)
+			_, err = stream.Write(testData)
+			if err != nil {
+				errChan <- fmt.Errorf("stream %d: failed to write: %w", idx, err)
+				return
+			}
+
+			response := make([]byte, len(testData))
+			_, err = io.ReadFull(stream, response)
+			if err != nil {
+				errChan <- fmt.Errorf("stream %d: failed to read: %w", idx, err)
+				return
+			}
+
+			if string(response) != string(testData) {
+				errChan <- fmt.Errorf("stream %d: data mismatch", idx)
+				return
+			}
+
+			errChan <- nil
+		}(i)
+	}
+
+	for i := 0; i < numStreams; i++ {
+		if err := <-errChan; err != nil {
+			t.Errorf("Concurrent stream error: %v", err)
+		}
+	}
+}
+
+func TestTunnelStreamClose(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	h1, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
+	if err != nil {
+		t.Fatalf("Failed to create host1: %v", err)
+	}
+	defer h1.Close()
+
+	h2, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
+	if err != nil {
+		t.Fatalf("Failed to create host2: %v", err)
+	}
+	defer h2.Close()
+
+	h1.Peerstore().AddAddrs(h2.ID(), h2.Addrs(), time.Hour)
+	if err := h1.Connect(ctx, peer.AddrInfo{ID: h2.ID(), Addrs: h2.Addrs()}); err != nil {
+		t.Fatalf("Failed to connect hosts: %v", err)
+	}
+
+	handler1 := NewHandler(h1, ctx, nil)
+	NewHandler(h2, ctx, nil)
+
+	echoListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to start echo server: %v", err)
+	}
+	defer echoListener.Close()
+	echoPort := echoListener.Addr().(*net.TCPAddr).Port
+
+	go func() {
+		for {
+			conn, err := echoListener.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				io.Copy(c, c)
+			}(conn)
+		}
+	}()
+
+	stream, err := handler1.OpenTunnel(h2.ID(), "127.0.0.1", uint16(echoPort))
+	if err != nil {
+		t.Fatalf("Failed to open tunnel: %v", err)
+	}
+
+	testData := []byte("Before close")
+	_, err = stream.Write(testData)
+	if err != nil {
+		t.Fatalf("Failed to write before close: %v", err)
+	}
+
+	response := make([]byte, len(testData))
+	_, err = io.ReadFull(stream, response)
+	if err != nil {
+		t.Fatalf("Failed to read before close: %v", err)
+	}
+
+	err = stream.Close()
+	if err != nil {
+		t.Errorf("Failed to close stream: %v", err)
+	}
+
+	_, err = stream.Write([]byte("After close"))
+	if err == nil {
+		t.Error("Expected error when writing to closed stream")
+	}
+}
+
