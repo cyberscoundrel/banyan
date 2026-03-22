@@ -27,38 +27,68 @@ The Banyan node is a libp2p-based peer-to-peer networking application that provi
 ### Architecture Diagram
 
 ```
-+---------------------------------------------------------------------+
-|                           main.go                                    |
-|                    (CLI & Configuration)                             |
-+---------------------------------------------------------------------+
-                                |
-                                v
-+---------------------------------------------------------------------+
-|                          node/node.go                               |
-|                     (Core Node Implementation)                       |
-|  +--------------+  +--------------+  +--------------+              |
-|  | libp2p Host  |  |     DHT      |  |   PubSub     |              |
-|  +--------------+  +--------------+  +--------------+              |
-+---------------------------------------------------------------------+
-        |                 |                  |
-        v                 v                  v
-+-------------+  +-------------+  +-----------------+
-| connection/ |  | discovery/  |  |    service/     |
-|   Manager   |  |   Manager   |  | Beacon/Locator  |
-+-------------+  +-------------+  +-----------------+
-        |                 |                  |
-        +-----------------+------------------+
-                          v
-              +-----------------------+
-              | libp2p-http/handler   |
-              |   (P2P HTTP Server)   |
-              +-----------------------+
-                          |
-                          v
-              +-----------------------+
-              | management-server/    |
-              |  (HTTP Management)    |
-              +-----------------------+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              ENTRY POINT                                 │
+│                                                                         │
+│   main.go ───────────────────────────────────────────── Loads config    │
+│     │                                                    Creates node    │
+│     ▼                                                    Starts services │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            NODE LAYER                                    │
+│                                                                         │
+│   node/node.go ───────────────────────────────────── Orchestrates all   │
+│     │                                                 components         │
+│     ├── libp2p Host (P2P networking)                                    │
+│     ├── DHT (Distributed Hash Table)                                    │
+│     └── PubSub (Publish/Subscribe messaging)                            │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+          ┌─────────────────────────┼─────────────────────────┐
+          ▼                         ▼                         ▼
+┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│   CONNECTION     │    │    DISCOVERY     │    │     SERVICE      │
+│                  │    │                  │    │                  │
+│ Tracks peers     │    │ Finds peers via: │    │ Manages:         │
+│ - Status         │    │ - DHT            │    │ - Beacons        │
+│ - HTTP capable   │    │ - mDNS           │    │ - Locators       │
+│ - Aliases        │    │ - GossipSub      │    │ - Fig templates  │
+└──────────────────┘    └──────────────────┘    └──────────────────┘
+          │                         │                         │
+          └─────────────────────────┼─────────────────────────┘
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          PROTOCOL HANDLERS                               │
+│                                                                         │
+│   libp2p-http/handler.go ─────────────────────────── P2P HTTP endpoints │
+│     ├── /ping        Health check                                       │
+│     ├── /greetings   Peer identification                                │
+│     └── /serviceFigs Fig template exchange                              │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          SERVER LAYER                                    │
+│                                                                         │
+│   management-server/ ─────────────────────────────── HTTP API server    │
+│     ├── /status           Node status                                   │
+│     ├── /peers            Peer list                                     │
+│     ├── /service/beacons  Service beacons                               │
+│     └── /tunnel           TCP tunnel management                         │
+│                                                                         │
+│   websocket/hub.go ───────────────────────────────── Event broadcasting │
+│     └── Real-time events to connected clients                           │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Data Flow Summary
+
+```
+User Request ──▶ main.go ──▶ node.go ──▶ Manager ──▶ Protocol Handler
+                                                        │
+                    ◀── Response ◀── Result ◀──────────┘
 ```
 
 ### Key Design Principles
