@@ -1,3 +1,20 @@
+// Package service provides service beacon and locator management for peer discovery
+// in a distributed network. It implements a pub/sub-based service discovery mechanism
+// where nodes can announce their services (beacons) or discover services offered by
+// other peers (locators).
+//
+// The package supports multiple concurrent service beacons and locators, allowing a
+// single node to both provide and consume multiple services simultaneously. Service
+// discovery uses libp2p gossipsub for efficient broadcast-based announcements and
+// direct peer-to-peer responses for targeted communication.
+//
+// Key components:
+//   - Manager: Coordinates beacon and locator lifecycle and handles peer connections
+//   - ServiceBeacon: Announces service availability to the network
+//   - ServiceLocator: Discovers and connects to service providers
+//
+// Security features include optional cryptographic signatures on announcements,
+// encrypted peer ID exchange, and transport-based address filtering.
 package service
 
 import (
@@ -24,9 +41,9 @@ import (
 	"banyan/types"
 )
 
-// Types - would normally be in shared package
-// Use types.ServiceLookupRequest instead of local definition
-
+// LookupResponse represents a response to a peer lookup request.
+// It contains the responder's peer information, addresses, and optional
+// cryptographic material for secure communication.
 type LookupResponse struct {
 	Type          string    `json:"type"`
 	Target        string    `json:"target"`
@@ -40,15 +57,22 @@ type LookupResponse struct {
 	Timestamp     time.Time `json:"timestamp"`
 }
 
-// Constants
+// Connection and event type constants.
 const (
+	// ConnTypeHTTPVerified indicates a connection verified via HTTP transport.
 	ConnTypeHTTPVerified = "http-verified"
-	EventConnection      = "connection"
-	EventError           = "error"
-	EventInfo            = "info"
+	// EventConnection is emitted when a peer connection is established.
+	EventConnection = "connection"
+	// EventError is emitted when an error occurs.
+	EventError = "error"
+	// EventInfo is emitted for informational events.
+	EventInfo = "info"
 )
 
-// ServiceLocator handles service discovery for a specific service
+// ServiceLocator discovers and connects to service providers for a specific service.
+// It operates in either announce mode (responding to lookup requests) or lookup mode
+// (actively searching for providers). The locator uses gossipsub for discovery and
+// supports encrypted peer ID exchange for privacy.
 type ServiceLocator struct {
 	serviceManager *Manager
 	ServiceKey     crypto.PubKey
@@ -62,7 +86,8 @@ type ServiceLocator struct {
 	ephemeralPub  []byte
 }
 
-// Start starts the service locator's operations
+// Start initializes the locator's ephemeral keypair, begins processing incoming
+// messages, and starts periodic lookup requests if in lookup mode.
 func (sl *ServiceLocator) Start() error {
 	// Generate ephemeral keypair for this locator session if not already present
 	if sl.ephemeralPriv == nil {
@@ -102,7 +127,7 @@ func (sl *ServiceLocator) Start() error {
 	return nil
 }
 
-// Stop stops the service locator
+// Stop halts the locator's periodic requests and cancels message processing.
 func (sl *ServiceLocator) Stop() error {
 	if sl.ticker != nil {
 		sl.ticker.Stop()
@@ -116,27 +141,27 @@ func (sl *ServiceLocator) Stop() error {
 	return nil
 }
 
-// GetMode returns the locator mode
+// GetMode returns the current operating mode (announce or lookup).
 func (sl *ServiceLocator) GetMode() types.ServiceBeaconMode {
 	return sl.mode
 }
 
-// SetMode sets the locator mode
+// SetMode configures the operating mode (announce or lookup).
 func (sl *ServiceLocator) SetMode(mode types.ServiceBeaconMode) {
 	sl.mode = mode
 }
 
-// GetLimit returns the service limit
+// GetLimit returns the maximum number of service providers to discover.
 func (sl *ServiceLocator) GetLimit() int {
 	return sl.limit
 }
 
-// SetLimit sets the service limit
+// SetLimit configures the maximum number of service providers to discover.
 func (sl *ServiceLocator) SetLimit(limit int) {
 	sl.limit = limit
 }
 
-// IsRunning returns whether the locator is running
+// IsRunning reports whether the locator is actively processing requests.
 func (sl *ServiceLocator) IsRunning() bool {
 	return sl.ticker != nil
 }
@@ -207,11 +232,7 @@ func (sl *ServiceLocator) handleServiceAnnouncement(announcement *types.ServiceA
 		return // Not for our service
 	}
 
-	peerIDShort := from.String()
-	if len(peerIDShort) > 8 {
-		peerIDShort = peerIDShort[:8]
-	}
-	// log.Printf("[LOCATOR] Received announcement from %s for service key %x (has_peer_id: %v)", peerIDShort, expectedKey[:8], announcement.PeerID != "")
+	// log.Printf("[LOCATOR] Received announcement from %s for service key %x (has_peer_id: %v)", from.String()[:8], expectedKey[:8], announcement.PeerID != "")
 	sl.serviceManager.eventSender(EventInfo, map[string]interface{}{
 		"message":     "Received service announcement for our service key",
 		"from":        from.String(),
@@ -416,7 +437,10 @@ func (sl *ServiceLocator) equal(a, b []byte) bool {
 	return true
 }
 
-// ServiceBeacon announces service availability
+// ServiceBeacon announces service availability to the network.
+// It periodically broadcasts service announcements and responds to lookup requests
+// from peers seeking the service. Beacons can optionally include peer IDs in
+// announcements and support transport-restricted address filtering via fig files.
 type ServiceBeacon struct {
 	serviceManager *Manager
 	ServicePrivKey crypto.PrivKey
@@ -434,7 +458,7 @@ type ServiceBeacon struct {
 	onlyIncludePeerIDInDirectReply bool
 }
 
-// Start starts the service beacon
+// Start begins periodic announcements and starts processing incoming lookup requests.
 func (sb *ServiceBeacon) Start() error {
 	// Start ticker for periodic announcements (every 5 seconds until peers found)
 	sb.ticker = time.NewTicker(5 * time.Second)
@@ -462,7 +486,7 @@ func (sb *ServiceBeacon) Start() error {
 	return nil
 }
 
-// Stop stops the service beacon
+// Stop halts periodic announcements and cancels message processing.
 func (sb *ServiceBeacon) Stop() error {
 	if sb.ticker != nil {
 		sb.ticker.Stop()
@@ -476,30 +500,32 @@ func (sb *ServiceBeacon) Stop() error {
 	return nil
 }
 
-// GetServiceKey returns the service private key
+// GetServiceKey returns the service's private key used for signing announcements.
 func (sb *ServiceBeacon) GetServiceKey() crypto.PrivKey {
 	return sb.ServicePrivKey
 }
 
-// GetMode returns the beacon mode
+// GetMode returns the current operating mode.
 func (sb *ServiceBeacon) GetMode() types.ServiceBeaconMode {
 	return sb.mode
 }
 
-// SetMode sets the beacon mode
+// SetMode configures the operating mode.
 func (sb *ServiceBeacon) SetMode(mode types.ServiceBeaconMode) {
 	sb.mode = mode
 }
 
-// GetPeers returns the list of connected peers
+// GetPeers returns the list of peers currently connected to this beacon.
 func (sb *ServiceBeacon) GetPeers() []peer.ID {
 	return sb.peers
 }
 
-// GetAlias returns the configured alias for this beacon (may be empty)
+// GetAlias returns the human-readable alias configured for this beacon.
+// Returns an empty string if no alias was set.
 func (sb *ServiceBeacon) GetAlias() string { return sb.Alias }
 
-// GetFigTemplates returns raw fig template bytes associated to this beacon
+// GetFigTemplates returns the raw fig template bytes associated with this beacon.
+// Fig templates define transport restrictions and routing rules.
 func (sb *ServiceBeacon) GetFigTemplates() [][]byte { return sb.FigTemplates }
 
 // processMessages handles incoming PubSub messages
@@ -557,11 +583,7 @@ func (sb *ServiceBeacon) handleServiceLookupRequest(request *types.ServiceLookup
 		return // Not for our service
 	}
 
-	peerIDShort := from.String()
-	if len(peerIDShort) > 8 {
-		peerIDShort = peerIDShort[:8]
-	}
-	// log.Printf("[BEACON] Received lookup request from %s for service key %x", peerIDShort, serviceKeyBytes[:8])
+	// log.Printf("[BEACON] Received lookup request from %s for service key %x", from.String()[:8], serviceKeyBytes[:8])
 	sb.serviceManager.eventSender(EventInfo, map[string]interface{}{
 		"message":     "Received service lookup request for our service key",
 		"from":        from.String(),
@@ -794,7 +816,9 @@ func (sb *ServiceBeacon) equal(a, b []byte) bool {
 	return true
 }
 
-// Manager handles service beacon and locator functionality
+// Manager coordinates service beacon and locator lifecycle, peer connections,
+// and cryptographic operations. It supports multiple concurrent beacons and locators,
+// allowing a single node to provide and consume multiple services simultaneously.
 type Manager struct {
 	host              host.Host
 	ctx               context.Context
@@ -860,7 +884,19 @@ func (m *Manager) verifyServiceAnnouncement(a *types.ServiceAnnouncement) bool {
 	return err == nil && ok
 }
 
-// NewManager creates a new service manager
+// NewManager creates a new service manager with the given configuration.
+// Parameters:
+//   - host: libp2p host for peer communication
+//   - ctx: context for lifecycle management
+//   - pubsub: gossipsub instance for service announcements
+//   - cryptoManager: handles encryption and decryption operations
+//   - connectionManager: manages peer connections
+//   - httpTransport: HTTP transport for direct peer responses
+//   - eventSender: callback for emitting events
+//   - noCrypto: disables cryptographic verification when true
+//   - beaconIncludePeerIDAnnouncements: includes peer ID in broadcast announcements
+//   - beaconPeerIDDirectOnly: only includes peer ID in direct responses
+//   - overrideTransportRestrictions: allows fallback to peer discovery on connection failure
 func NewManager(host host.Host, ctx context.Context, pubsub *pubsub.PubSub,
 	cryptoManager interfaces.CryptoManager, connectionManager interfaces.PeerManager, httpTransport *http.Transport, eventSender func(string, interface{}), noCrypto bool, beaconIncludePeerIDAnnouncements bool, beaconPeerIDDirectOnly bool, overrideTransportRestrictions bool) interfaces.ServiceManager {
 	return &Manager{
@@ -880,7 +916,9 @@ func NewManager(host host.Host, ctx context.Context, pubsub *pubsub.PubSub,
 	}
 }
 
-// CreateServiceBeacon creates a new service beacon for the given service private key
+// CreateServiceBeacon creates a new service beacon for announcing service availability.
+// The beacon uses the provided private key to sign announcements and creates a unique
+// gossipsub topic based on the service public key hash.
 func (m *Manager) CreateServiceBeacon(servicePrivKey crypto.PrivKey) (interfaces.ServiceBeacon, error) {
 	// Create a topic name based on the hash of the service public key
 	servicePubKey := servicePrivKey.GetPublic()
@@ -936,7 +974,9 @@ func (m *Manager) CreateServiceBeacon(servicePrivKey crypto.PrivKey) (interfaces
 	return beacon, nil
 }
 
-// CreateServiceBeaconWithMeta creates a service beacon and attaches alias and fig templates
+// CreateServiceBeaconWithMeta creates a service beacon with additional metadata.
+// The alias provides a human-readable identifier, and fig templates define
+// transport restrictions and routing rules for the service.
 func (m *Manager) CreateServiceBeaconWithMeta(servicePrivKey crypto.PrivKey, alias string, figTemplates [][]byte) (interfaces.ServiceBeacon, error) {
 	b, err := m.CreateServiceBeacon(servicePrivKey)
 	if err != nil {
@@ -948,7 +988,9 @@ func (m *Manager) CreateServiceBeaconWithMeta(servicePrivKey crypto.PrivKey, ali
 	return sb, nil
 }
 
-// StartServiceLocator starts a service locator for the given service public key
+// StartServiceLocator creates and starts a locator for discovering service providers.
+// The locator joins the service's gossipsub topic and begins processing messages
+// according to the specified mode (announce or lookup).
 func (m *Manager) StartServiceLocator(servicePubKey crypto.PubKey, mode types.ServiceBeaconMode) error {
 	servicePubKeyBytes, err := crypto.MarshalPublicKey(servicePubKey)
 	if err != nil {
@@ -1016,7 +1058,9 @@ func (m *Manager) StartServiceLocator(servicePubKey crypto.PubKey, mode types.Se
 	return nil
 }
 
-// ExtractPeerIDFromServiceRequest extracts the peer ID from a service request using legacy single service key
+// ExtractPeerIDFromServiceRequest extracts the peer ID from a service lookup request
+// using the legacy single service key. Returns an empty string if extraction fails
+// or crypto is disabled for encrypted requests.
 func (m *Manager) ExtractPeerIDFromServiceRequest(req *types.ServiceLookupRequest) string {
 	if req.FromEncrypted && len(req.EncryptedFrom) > 0 && len(req.EncryptedNonce) > 0 {
 		// Skip encrypted data if crypto is disabled
@@ -1040,7 +1084,9 @@ func (m *Manager) ExtractPeerIDFromServiceRequest(req *types.ServiceLookupReques
 	return req.From
 }
 
-// ExtractPeerIDFromServiceRequestWithKey extracts the peer ID from a service request using a specific service key
+// ExtractPeerIDFromServiceRequestWithKey extracts the peer ID from a service lookup request
+// using a specific service private key for decryption. This allows multiple beacons
+// to decrypt requests targeted at their specific service.
 func (m *Manager) ExtractPeerIDFromServiceRequestWithKey(req *types.ServiceLookupRequest, servicePrivKey crypto.PrivKey) string {
 	if req.FromEncrypted && len(req.EncryptedFrom) > 0 && len(req.EncryptedNonce) > 0 {
 		// Skip encrypted data if crypto is disabled
@@ -1064,7 +1110,8 @@ func (m *Manager) ExtractPeerIDFromServiceRequestWithKey(req *types.ServiceLooku
 	return req.From
 }
 
-// ConnectToServiceProvider connects to a service provider
+// ConnectToServiceProvider establishes a connection to a service provider peer
+// using peer discovery. If already connected, it verifies and tracks the connection.
 func (m *Manager) ConnectToServiceProvider(peerID peer.ID) {
 	// Check if already connected
 	if m.host.Network().Connectedness(peerID) == network.Connected {
@@ -1103,7 +1150,8 @@ func (m *Manager) ConnectToServiceProvider(peerID peer.ID) {
 	go m.connectionManager.CreateBidirectionalConnection(peerID)
 }
 
-// SendServiceLookupResponse sends a response to a service lookup request
+// SendServiceLookupResponse sends a response to a service lookup request.
+// This method is intended for custom service response handling.
 func (m *Manager) SendServiceLookupResponse(req *types.ServiceLookupRequest) {
 	// This method would handle responding to service lookup requests
 	// Implementation would depend on the specific service logic
@@ -1113,14 +1161,15 @@ func (m *Manager) SendServiceLookupResponse(req *types.ServiceLookupRequest) {
 	})
 }
 
-// GetServiceBeacon returns the current service beacon
-// DEPRECATED: This only returns the first beacon. Use ListServiceBeacons() for multi-beacon support.
-// This method is kept for backward compatibility but should not be used in new code.
+// GetServiceBeacon returns the first service beacon.
+//
+// Deprecated: This method only returns the first beacon and does not support
+// multi-beacon scenarios. Use ListServiceBeacons() for new code.
 func (m *Manager) GetServiceBeacon() interfaces.ServiceBeacon {
 	return m.serviceBeacon
 }
 
-// ListServiceBeacons returns all active service beacons
+// ListServiceBeacons returns all active service beacons managed by this manager.
 func (m *Manager) ListServiceBeacons() []interfaces.ServiceBeacon {
 	res := make([]interfaces.ServiceBeacon, 0, len(m.serviceBeacons))
 	for _, b := range m.serviceBeacons {
@@ -1129,7 +1178,8 @@ func (m *Manager) ListServiceBeacons() []interfaces.ServiceBeacon {
 	return res
 }
 
-// SendConnectToPeerResponse sends a response to connect to peer request
+// SendConnectToPeerResponse sends a discovery response to a peer requesting connection.
+// The response includes the local node's addresses and public key.
 func (m *Manager) SendConnectToPeerResponse(peerIDStr string) {
 	// Parse peer ID
 	peerID, err := peer.Decode(peerIDStr)
@@ -1175,7 +1225,9 @@ func (m *Manager) SendConnectToPeerResponse(peerIDStr string) {
 	m.SendDirectDiscoveryResponse(peerID, response)
 }
 
-// SendDirectServiceResponse sends a response directly to a peer
+// SendDirectServiceResponse sends a service response directly to a specific peer
+// using libp2p HTTP transport. The response is marshaled to JSON and posted
+// to the peer's service response endpoint.
 func (m *Manager) SendDirectServiceResponse(peerID peer.ID, response *types.ServiceResponse) {
 	responseData, err := json.Marshal(response)
 	if err != nil {
@@ -1224,7 +1276,8 @@ func (m *Manager) SendDirectServiceResponse(peerID peer.ID, response *types.Serv
 	}
 }
 
-// SendDirectDiscoveryResponse sends a discovery (LookupResponse) directly to a peer
+// SendDirectDiscoveryResponse sends a discovery response directly to a specific peer
+// using libp2p HTTP transport.
 func (m *Manager) SendDirectDiscoveryResponse(peerID peer.ID, response *types.LookupResponse) {
 	responseData, err := json.Marshal(response)
 	if err != nil {
@@ -1273,7 +1326,9 @@ func (m *Manager) SendDirectDiscoveryResponse(peerID peer.ID, response *types.Lo
 	}
 }
 
-// ProcessServiceResponse processes a direct service response, decrypts peer ID, and connects
+// ProcessServiceResponse handles an incoming service response by verifying the
+// signature, decrypting the responder's peer ID, and establishing a connection.
+// It attempts decryption using all active locators' ephemeral keys.
 func (m *Manager) ProcessServiceResponse(resp *types.ServiceResponse) {
 	// Determine responder peer id
 	peerIDStr := strings.TrimSpace(resp.From)
@@ -1333,7 +1388,8 @@ func (m *Manager) ProcessServiceResponse(resp *types.ServiceResponse) {
 	}
 }
 
-// TestServicePeerBidirectionality tests bidirectional connection with a service peer
+// TestServicePeerBidirectionality verifies bidirectional HTTP connectivity with a
+// service peer by making a ping request via libp2p HTTP transport.
 func (m *Manager) TestServicePeerBidirectionality(peerID peer.ID, serviceKey []byte) {
 	m.eventSender(EventConnection, map[string]interface{}{
 		"message":     "Testing bidirectional connection with service peer",
@@ -1383,7 +1439,9 @@ func (m *Manager) TestServicePeerBidirectionality(peerID peer.ID, serviceKey []b
 	}
 }
 
-// ConnectToServiceProviderDirectly attempts to connect directly to a service provider using provided addresses
+// ConnectToServiceProviderDirectly establishes a connection using explicitly provided
+// multiaddresses rather than peer discovery. If all direct connection attempts fail
+// and overrideTransportRestrictions is enabled, it falls back to peer discovery.
 func (m *Manager) ConnectToServiceProviderDirectly(peerID peer.ID, addresses []string) {
 	m.eventSender(EventConnection, map[string]interface{}{
 		"message":   "Attempting direct connection to service provider",
