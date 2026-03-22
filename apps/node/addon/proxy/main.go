@@ -1,3 +1,18 @@
+// The proxy addon provides an HTTP and SOCKS5 proxy server with special routing for
+// .fig and .peer domains. It enables transparent access to remote services and peers
+// through the Banyan network.
+//
+// .fig domains (e.g., myservice.fig) are resolved via the management API to find
+// the associated peer, then tunneled through the p2p connection.
+//
+// .peer domains (e.g., peerID.peer or alias.peer) route directly to specific peers,
+// supporting both full peer IDs and 4-character aliases.
+//
+// Usage:
+//
+//	proxy [-port PORT] [-addr ADDR]
+//
+// The addon requires BANYAN_MGMT_URL to be set by the addon manager.
 package main
 
 import (
@@ -109,7 +124,7 @@ func handleConnection(conn net.Conn) {
 	}
 }
 
-// bufferedConn wraps a net.Conn with a buffer of already-read bytes
+// bufferedConn wraps a net.Conn with a pre-read buffer for protocol detection.
 type bufferedConn struct {
 	net.Conn
 	buf []byte
@@ -230,7 +245,7 @@ func isPeerAddress(host string) bool {
 	return strings.HasSuffix(strings.ToLower(h), ".peer")
 }
 
-// peerAddressInfo contains parsed peer address information
+// peerAddressInfo contains parsed components from a .peer hostname.
 type peerAddressInfo struct {
 	PeerID    string
 	Multiaddr string // Empty if no multiaddr provided (use DHT)
@@ -249,11 +264,9 @@ type peerAddressInfo struct {
 //   - 12D3KooWExample.peer -> peerID=12D3KooWExample, multiaddr=""
 //   - ip4-127_0_0_1-tcp-9000.p2p.12D3KooWExample.peer -> peerID=12D3KooWExample, multiaddr="/ip4/127.0.0.1/tcp/9000"
 //
-// decodePeerID decodes a DNS-safe peer ID back to the original case-sensitive format.
-// Since DNS is case-insensitive and base58 peer IDs are case-sensitive, we use '0'
-// (which is not in base58 alphabet) as an escape character:
-//   - '0' followed by a letter means that letter should be uppercase
-//   - Example: "120d30k0o0o0w..." decodes to "12D3KooW..."
+// decodePeerID decodes a DNS-safe encoded peer ID back to its original case-sensitive form.
+// Since DNS is case-insensitive, uppercase letters in base58 peer IDs are encoded as
+// '0' followed by the lowercase letter. For example, "12D3KooW" encodes as "120d30k0o0o0w".
 func decodePeerID(encoded string) string {
 	var result strings.Builder
 	i := 0
@@ -273,8 +286,7 @@ func decodePeerID(encoded string) string {
 	return result.String()
 }
 
-// resolvePeerAlias resolves a 4-character peer alias to a full peer ID
-// by calling the node's management API
+// resolvePeerAlias resolves a 4-character peer alias to a full peer ID via the management API.
 func resolvePeerAlias(alias string) (string, error) {
 	resp, err := http.Get(managerURL + "/network/connections")
 	if err != nil {
@@ -308,7 +320,7 @@ func resolvePeerAlias(alias string) (string, error) {
 	return "", fmt.Errorf("no peer found with alias '%s'", alias)
 }
 
-// isPeerAlias checks if the string looks like a peer alias (4 alphanumeric chars)
+// isPeerAlias returns true if the string is a 4-character lowercase alphanumeric alias.
 func isPeerAlias(s string) bool {
 	if len(s) != 4 {
 		return false
@@ -321,6 +333,13 @@ func isPeerAlias(s string) bool {
 	return true
 }
 
+// parsePeerAddress parses a .peer hostname and extracts the peer ID and optional multiaddr.
+// Supported formats:
+//   - {peerID}.peer - full peer ID, uses DHT for discovery
+//   - {multiaddr-encoded}.p2p.{peerID}.peer - with explicit multiaddr
+//   - {alias}.peer - 4-character alias resolved via management API
+//
+// Multiaddr encoding uses '-' for '/' and '_' for '.'.
 func parsePeerAddress(host string) peerAddressInfo {
 	// Remove port if present
 	h := host
@@ -377,7 +396,7 @@ func parsePeerAddress(host string) peerAddressInfo {
 	}
 }
 
-// extractPeerID is a convenience function that just extracts the peer ID
+// extractPeerID is a convenience that returns just the peer ID from a .peer hostname.
 func extractPeerID(host string) string {
 	return parsePeerAddress(host).PeerID
 }
@@ -538,6 +557,7 @@ func handlePeerHTTPRequest(conn net.Conn, req *http.Request, host string) {
 	resp.Write(conn)
 }
 
+// resolveAliasToPeer resolves a .fig alias to a peer ID via the management API.
 func resolveAliasToPeer(alias string) (string, error) {
 	// Call management API to resolve alias
 	resp, err := http.Get(fmt.Sprintf("%s/services/find?alias=%s", managerURL, url.QueryEscape(alias)))
@@ -567,6 +587,7 @@ func resolveAliasToPeer(alias string) (string, error) {
 	return result.Peers[0].PeerID, nil
 }
 
+// openTunnel requests a tunnel to a peer's service via the management API and returns the local port.
 func openTunnel(peerID string, targetHost string, targetPort uint16) (int, error) {
 	reqBody, _ := json.Marshal(map[string]any{
 		"peer_id":     peerID,
@@ -599,7 +620,7 @@ func openTunnel(peerID string, targetHost string, targetPort uint16) (int, error
 	return result.LocalPort, nil
 }
 
-// checkPeerConnected checks if we're connected to a peer
+// checkPeerConnected queries the management API to check if already connected to a peer.
 func checkPeerConnected(peerID string) (bool, error) {
 	resp, err := http.Get(managerURL + "/network/connections")
 	if err != nil {
@@ -629,10 +650,8 @@ func checkPeerConnected(peerID string) (bool, error) {
 	return false, nil
 }
 
-// encodePeerIDForDNS encodes a peer ID for use in DNS hostnames.
-// Since DNS is case-insensitive and base58 peer IDs are case-sensitive,
-// we use '0' (not in base58 alphabet) as an escape for uppercase letters.
-// Example: "12D3KooW" -> "120d30k0o0o0w"
+// encodePeerIDForDNS encodes a case-sensitive peer ID for use in DNS hostnames.
+// Uppercase letters are prefixed with '0' and converted to lowercase.
 func encodePeerIDForDNS(peerID string) string {
 	var result strings.Builder
 	for _, c := range peerID {
@@ -646,7 +665,7 @@ func encodePeerIDForDNS(peerID string) string {
 	return result.String()
 }
 
-// connectToPeer attempts to connect to a peer via DHT
+// connectToPeer initiates a connection to a peer via DHT lookup through the management API.
 func connectToPeer(peerID string) error {
 	resp, err := http.Post(
 		managerURL+"/network/connect/"+peerID,
@@ -666,7 +685,7 @@ func connectToPeer(peerID string) error {
 	return nil
 }
 
-// connectToPeerWithMultiaddr attempts to connect to a peer using a specific multiaddr
+// connectToPeerWithMultiaddr initiates a connection to a peer using a specific multiaddr.
 func connectToPeerWithMultiaddr(peerID string, multiaddr string) error {
 	reqBody, _ := json.Marshal(map[string]string{
 		"peer_id":   peerID,
@@ -691,8 +710,7 @@ func connectToPeerWithMultiaddr(peerID string, multiaddr string) error {
 	return nil
 }
 
-// ensurePeerConnected makes sure we're connected to a peer, connecting if needed
-// If multiaddr is provided, uses it directly; otherwise uses DHT
+// ensurePeerConnected verifies connection to a peer, connecting via multiaddr or DHT if needed.
 func ensurePeerConnected(peerInfo peerAddressInfo) error {
 	// First check if already connected
 	connected, _ := checkPeerConnected(peerInfo.PeerID)
@@ -721,6 +739,7 @@ func ensurePeerConnected(peerInfo peerAddressInfo) error {
 	return nil
 }
 
+// relay bidirectionally copies data between two connections until one side closes.
 func relay(c1, c2 net.Conn) {
 	done := make(chan struct{}, 2)
 	go func() {
@@ -734,7 +753,7 @@ func relay(c1, c2 net.Conn) {
 	<-done
 }
 
-// SOCKS5 implementation
+// handleSOCKS5 processes a SOCKS5 connection request after protocol detection.
 func handleSOCKS5(conn net.Conn) {
 	// We already read the first byte (0x05) in handleConnection
 	// Read number of authentication methods

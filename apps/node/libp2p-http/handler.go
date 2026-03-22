@@ -1,3 +1,17 @@
+// Package libp2phttp provides HTTP handlers for peer-to-peer communication over libp2p.
+// It implements a set of HTTP endpoints that enable peers to discover each other,
+// exchange service information, and route requests through the P2P network.
+//
+// The package uses go-libp2p-gostream to expose standard HTTP handlers over libp2p streams,
+// allowing seamless integration with existing HTTP clients and servers while leveraging
+// the security and identity features of libp2p.
+//
+// Key endpoints include:
+//   - /ping - Health check endpoint
+//   - /greetings - Peer discovery and capability exchange
+//   - /status - Node status information
+//   - /services/figs - Service fig file distribution
+//   - /router/* - HTTP request routing to configured backends
 package libp2phttp
 
 import (
@@ -22,9 +36,9 @@ import (
 	"banyan/types"
 )
 
-// Note: All types and interfaces moved to shared packages
-
-// Handler handles HTTP endpoint logic
+// Handler manages HTTP endpoint logic for the libp2p HTTP protocol server.
+// It provides handlers for peer discovery, service advertisement, status reporting,
+// and request routing within the P2P network.
 type Handler struct {
 	host                    host.Host
 	ctx                     context.Context
@@ -39,7 +53,10 @@ type Handler struct {
 	noCrypto                bool
 }
 
-// NewHandler creates a new HTTP handler
+// NewHandler creates a new Handler instance with the provided dependencies.
+// The handler requires a libp2p host, context, HTTP transport, connection manager,
+// service manager, crypto manager, event broadcaster, and route table to function.
+// If noCrypto is true, plaintext communication is allowed for testing purposes.
 func NewHandler(host host.Host, ctx context.Context, httpTransport *http.Transport,
 	connectionManager interfaces.PeerManager, serviceManager interfaces.ServiceManager, cryptoManager interfaces.CryptoManager, eventBroadcaster interfaces.EventBroadcaster, routeTable *types.RouteTable, noCrypto bool) interfaces.HTTPHandler {
 	return &Handler{
@@ -55,14 +72,18 @@ func NewHandler(host host.Host, ctx context.Context, httpTransport *http.Transpo
 	}
 }
 
-// sendEvent sends an event via the event broadcaster
+// sendEvent broadcasts an event to all registered event listeners.
+// If no event broadcaster is configured, the call is a no-op.
 func (h *Handler) sendEvent(eventType string, data interface{}) {
 	if h.eventBroadcaster != nil {
 		h.eventBroadcaster.SendEvent(eventType, data)
 	}
 }
 
-// StartP2PProtocolServer starts the libp2p protocol server using gostream
+// StartP2PProtocolServer starts the libp2p HTTP protocol server using gostream.
+// It creates a listener on the default libp2p HTTP protocol and registers
+// handlers for peer-to-peer communication endpoints. This method blocks
+// and should typically be run in a goroutine.
 func (h *Handler) StartP2PProtocolServer() {
 	// Create a listener using gostream.Listen
 	listener, err := gostream.Listen(h.host, p2phttp.DefaultP2PProtocol)
@@ -112,19 +133,26 @@ func (h *Handler) StartP2PProtocolServer() {
 	}
 }
 
-// MountP2P registers a handler on the libp2p HTTP mux.
+// MountP2P registers a custom handler function on the libp2p HTTP mux.
+// This allows external packages to add their own endpoints to the P2P server.
+// The handler must be registered before StartP2PProtocolServer is called.
 func (h *Handler) MountP2P(path string, fn func(http.ResponseWriter, *http.Request)) {
 	if h.mux != nil {
 		h.mux.HandleFunc(path, fn)
 	}
 }
 
-// SetAddonDisclosureProvider wires a provider for addon disclosures included in greetings
+// SetAddonDisclosureProvider sets a callback function that provides addon disclosure
+// information to be included in greeting responses. This allows the node to advertise
+// additional capabilities and extensions to peers during discovery.
 func (h *Handler) SetAddonDisclosureProvider(provider func() []types.AddonDisclosure) {
 	h.addonDisclosureProvider = provider
 }
 
-// HandleDiscoveryResponse accepts direct discovery lookup responses and connects
+// HandleDiscoveryResponse processes incoming discovery lookup responses from peers.
+// It accepts POST requests containing peer address information, optionally encrypted,
+// and initiates connections to the responding peer. This enables direct peer-to-peer
+// connections without requiring DHT-based discovery.
 func (h *Handler) HandleDiscoveryResponse(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -138,7 +166,7 @@ func (h *Handler) HandleDiscoveryResponse(w http.ResponseWriter, r *http.Request
 	}
 
 	// Enforce crypto policy: allow plaintext only if crypto disabled
-	if !h.noCrypto && resp.Encrypted == false && len(resp.Addresses) > 0 {
+	if !h.noCrypto && !resp.Encrypted && len(resp.Addresses) > 0 {
 		http.Error(w, "unencrypted addresses rejected", http.StatusBadRequest)
 		return
 	}
@@ -181,7 +209,9 @@ func (h *Handler) HandleDiscoveryResponse(w http.ResponseWriter, r *http.Request
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok"})
 }
 
-// HandleServiceResponse handles direct service lookup responses sent via libp2p HTTP
+// HandleServiceResponse processes incoming service lookup responses from peers.
+// It accepts POST requests containing service information and delegates processing
+// to the service manager for decryption and connection establishment.
 func (h *Handler) HandleServiceResponse(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -201,9 +231,9 @@ func (h *Handler) HandleServiceResponse(w http.ResponseWriter, r *http.Request) 
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok"})
 }
 
-// Note: Data in figs originates from the peer's local fig JSON.
-
-// HandlePing responds to ping requests
+// HandlePing responds to health check requests from peers.
+// It returns a JSON response containing the peer ID, status, request method, and path.
+// This endpoint is useful for verifying peer connectivity and liveness.
 func (h *Handler) HandlePing(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -215,7 +245,11 @@ func (h *Handler) HandlePing(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandleGreetings handles greeting requests - enhanced to replace service-lookup functionality
+// HandleGreetings handles peer greeting and capability exchange requests.
+// It responds with peer information including service keys, HTTP capabilities,
+// network addresses, and addon disclosures. The response is signed with the
+// peer's private key for authentication. This endpoint serves as the primary
+// peer discovery mechanism.
 func (h *Handler) HandleGreetings(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" && r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -297,9 +331,17 @@ func (h *Handler) HandleGreetings(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// HandleServiceFigs returns the public service keys this node serves and a signed fig per beacon.
-// Request body may include either {"nonce":"hex"} or {"requesterPeerId":"peerid"}.
-// At least one must be included unless insecure figs are allowed by the receiving validator.
+// HandleServiceFigs returns all public service keys and signed fig files for this node.
+// The response includes service keys grouped by alias, with each group containing
+// a signed fig file that can be used by other nodes to resolve services.
+//
+// Request body (optional) may include:
+//   - nonce: A hex-encoded nonce to include in the fig for request verification
+//   - requesterPeerId: The peer ID of the requesting node for targeted fig generation
+//   - alias: Filter results to a specific service alias
+//
+// The fig files are signed with the service key(s) and may include additional
+// metadata from fig templates such as expiration times and required signers.
 func (h *Handler) HandleServiceFigs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost && r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -373,9 +415,7 @@ func (h *Handler) HandleServiceFigs(w http.ResponseWriter, r *http.Request) {
 		g.keyHexes = append(g.keyHexes, keyHex)
 		g.keyHashes = append(g.keyHashes, keyHash)
 		if tpls := b.GetFigTemplates(); len(tpls) > 0 {
-			for _, tpl := range tpls {
-				g.templates = append(g.templates, tpl)
-			}
+			g.templates = append(g.templates, tpls...)
 		}
 	}
 
@@ -532,10 +572,16 @@ func (h *Handler) HandleServiceFigs(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleServiceFigByKey returns a signed fig file for a specific service key.
+// The service key is specified in the URL path as a hex-encoded public key.
+//
 // URL format: /services/fig/{compressedPublicKeyHex}
-// Request body may include either {"nonce":"hex"} or {"requesterPeerId":"peerid"}.
-// This endpoint allows another node to request a signed fig file for a specific service key
-// that this node is serving, which can then be used to resolve to an alias.
+//
+// Request body (optional) may include:
+//   - nonce: A hex-encoded nonce to include in the fig for request verification
+//   - requesterPeerId: The peer ID of the requesting node for targeted fig generation
+//
+// This endpoint allows other nodes to request a signed fig file for a specific
+// service key that this node is serving, enabling service resolution by key.
 func (h *Handler) HandleServiceFigByKey(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost && r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -719,9 +765,10 @@ func (h *Handler) HandleServiceFigByKey(w http.ResponseWriter, r *http.Request) 
 	_ = json.NewEncoder(w).Encode(response)
 }
 
-// inferPeerIDFromRequest attempts to extract the remote peer ID for this HTTP request.
-// With go-libp2p-http, requests are transported over a libp2p stream. We try common hints
-// first (explicit header), then fall back to reverse-lookup via connection manager if available.
+// inferPeerIDFromRequest attempts to extract the remote peer ID from an HTTP request.
+// It first checks for an explicit X-Libp2p-PeerID header, then attempts to parse
+// the peer ID from the RemoteAddr field which may contain a multiaddr or peer ID.
+// Returns an empty string if the peer ID cannot be determined.
 func (h *Handler) inferPeerIDFromRequest(r *http.Request) string {
 	// 1) Custom header hint if the transport set it (not relied upon, best-effort)
 	if v := strings.TrimSpace(r.Header.Get("X-Libp2p-PeerID")); v != "" {
@@ -755,7 +802,9 @@ func (h *Handler) inferPeerIDFromRequest(r *http.Request) string {
 	return ""
 }
 
-// HandleStatus returns the node status
+// HandleStatus returns the current status of the node including peer ID,
+// running status, timestamp, and network addresses. This endpoint provides
+// a quick way to check node health and connectivity information.
 func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -767,7 +816,9 @@ func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandleConnectionsStatus returns the connections status
+// HandleConnectionsStatus returns detailed information about all peer connections.
+// The response includes peer IDs, aliases, connection status, connection types,
+// HTTP capabilities, and activity timestamps for each connected peer.
 func (h *Handler) HandleConnectionsStatus(w http.ResponseWriter, r *http.Request) {
 	connections := h.connectionManager.GetConnectionsCopy()
 
@@ -798,7 +849,9 @@ func (h *Handler) HandleConnectionsStatus(w http.ResponseWriter, r *http.Request
 	})
 }
 
-// HandleConnectToPeer handles connect to peer requests
+// HandleConnectToPeer handles requests to initiate a connection to a specific peer.
+// It accepts POST requests with a peer ID or 4-character alias in the URL path.
+// Upon successful connection initiation, it sends a connection response to the peer.
 func (h *Handler) HandleConnectToPeer(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -845,7 +898,10 @@ func (h *Handler) HandleConnectToPeer(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandleLibp2pHTTPProxy handles libp2p HTTP proxy requests
+// HandleLibp2pHTTPProxy handles HTTP proxy requests forwarded through the P2P network.
+// It extracts the target URL from the request path and forwards the request using
+// the configured HTTP transport, copying headers and response body back to the client.
+// Note: This endpoint is currently disabled in the P2P server for security reasons.
 func (h *Handler) HandleLibp2pHTTPProxy(w http.ResponseWriter, r *http.Request) {
 	// Extract the target URL from the path
 	path := strings.TrimPrefix(r.URL.Path, "/proxy/")
@@ -910,7 +966,10 @@ func (h *Handler) HandleLibp2pHTTPProxy(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-// HandleRouter handles router requests - forwards requests to configured URLs based on identifier
+// HandleRouter forwards HTTP requests to configured backend URLs based on route identifiers.
+// The URL format is /router/{identifier}/{path...} where the identifier maps to a
+// configured backend URL in the route table. Routing configuration can specify
+// path prefix handling and whether to preserve the full incoming path.
 func (h *Handler) HandleRouter(w http.ResponseWriter, r *http.Request) {
 	// Extract the path: /router/{identifier}/{path...}
 	path := strings.TrimPrefix(r.URL.Path, "/router/")

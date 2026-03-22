@@ -1,5 +1,6 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
+import DocsAPI from './DocsAPI';
 
 const DocsHome: React.FC = () => {
   return (
@@ -70,8 +71,9 @@ const DocsHome: React.FC = () => {
         While we build out the full documentation, you can explore the existing pages:
       </p>
       <ul>
+        <li><strong>API Reference</strong>: <a href="/docs/api">Auto-generated package documentation</a></li>
         <li><strong>Usage</strong>: Basic usage and command-line options</li>
-        <li><strong>API Reference</strong>: REST API endpoints and examples</li>
+        <li><strong>API</strong>: REST API endpoints and examples</li>
         <li><strong>Examples</strong>: Common usage scenarios and code samples</li>
       </ul>
     </div>
@@ -82,8 +84,8 @@ const Docs: React.FC = () => {
   return (
     <Routes>
       <Route index element={<DocsHome />} />
+      <Route path="api" element={<DocsAPI />} />
       <Route path="*" element={<DocsHome />} />
-      {/* Future documentation routes will be added here */}
     </Routes>
   );
 };

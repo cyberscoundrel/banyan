@@ -7,6 +7,4 @@ use (
 	./apps/node
 	./apps/topology-gen
 	./packages/addon-sdk
-	./packages/transports/i2p
-	./packages/transports/nym
 )

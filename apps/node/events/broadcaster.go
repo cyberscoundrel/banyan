@@ -1,3 +1,11 @@
+// Package events provides a real-time event broadcasting system for distributing
+// node events to WebSocket clients. It implements a publish-subscribe pattern where
+// internal components can broadcast events that are then forwarded to all connected
+// WebSocket hubs.
+//
+// The Broadcaster manages a list of WebSocket hub subscribers and provides thread-safe
+// methods for subscribing, unsubscribing, and broadcasting events. Each event includes
+// a type, timestamp, data payload, and the originating node's identifier.
 package events
 
 import (
@@ -8,14 +16,17 @@ import (
 	"banyan/types"
 )
 
-// Broadcaster implements a centralized event broadcasting system
+// Broadcaster implements a centralized event broadcasting system that distributes
+// events to multiple WebSocket hubs. It provides thread-safe subscriber management
+// and non-blocking event delivery.
 type Broadcaster struct {
 	subscribers []interfaces.WebSocketHub
 	mutex       sync.RWMutex
 	nodeID      string
 }
 
-// NewBroadcaster creates a new event broadcaster
+// NewBroadcaster creates a new event broadcaster with the specified node identifier.
+// The nodeID is included in all broadcast events to identify their source.
 func NewBroadcaster(nodeID string) interfaces.EventBroadcaster {
 	return &Broadcaster{
 		subscribers: make([]interfaces.WebSocketHub, 0),
@@ -23,7 +34,8 @@ func NewBroadcaster(nodeID string) interfaces.EventBroadcaster {
 	}
 }
 
-// BroadcastEvent sends an event to all registered subscribers
+// BroadcastEvent sends the given event to all registered WebSocket hub subscribers.
+// Each subscriber receives the event in a separate goroutine to prevent blocking.
 func (b *Broadcaster) BroadcastEvent(event types.Event) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
@@ -34,7 +46,9 @@ func (b *Broadcaster) BroadcastEvent(event types.Event) {
 	}
 }
 
-// SendEvent creates and broadcasts an event with the specified type and data
+// SendEvent creates a new event with the specified type and data, then broadcasts
+// it to all subscribers. The event is automatically populated with a timestamp
+// and the broadcaster's node ID.
 func (b *Broadcaster) SendEvent(eventType string, data interface{}) {
 	event := types.Event{
 		Type:      eventType,
@@ -45,14 +59,14 @@ func (b *Broadcaster) SendEvent(eventType string, data interface{}) {
 	b.BroadcastEvent(event)
 }
 
-// Subscribe adds a new subscriber to the broadcaster
+// Subscribe registers a WebSocket hub to receive broadcast events.
 func (b *Broadcaster) Subscribe(subscriber interfaces.WebSocketHub) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	b.subscribers = append(b.subscribers, subscriber)
 }
 
-// Unsubscribe removes a subscriber from the broadcaster
+// Unsubscribe removes a WebSocket hub from the subscriber list.
 func (b *Broadcaster) Unsubscribe(subscriber interfaces.WebSocketHub) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -66,14 +80,14 @@ func (b *Broadcaster) Unsubscribe(subscriber interfaces.WebSocketHub) {
 	}
 }
 
-// GetSubscriberCount returns the number of active subscribers
+// GetSubscriberCount returns the number of currently registered subscribers.
 func (b *Broadcaster) GetSubscriberCount() int {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 	return len(b.subscribers)
 }
 
-// SetNodeID updates the node ID for future events
+// SetNodeID updates the node identifier used in future broadcast events.
 func (b *Broadcaster) SetNodeID(nodeID string) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()

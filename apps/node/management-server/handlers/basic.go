@@ -1,3 +1,6 @@
+// Package handlers provides HTTP endpoint handlers for the Banyan management server.
+// It includes handlers for basic endpoints, peer management, service discovery,
+// proxying, tunneling, libp2p operations, routing, and WebSocket connections.
 package handlers
 
 import (
@@ -11,7 +14,8 @@ import (
 	"banyan/common"
 )
 
-// BasicHandlers provides basic HTTP endpoint handlers
+// BasicHandlers provides HTTP endpoint handlers for basic server operations
+// including health checks, echo endpoints, and graceful shutdown.
 type BasicHandlers struct {
 	shutdownFunc func()
 }
@@ -26,7 +30,8 @@ func (bh *BasicHandlers) SetShutdownFunc(fn func()) {
 	bh.shutdownFunc = fn
 }
 
-// HandleRequest handles the root endpoint with echo functionality
+// HandleRequest handles the root endpoint (/) and echoes back request information
+// including method, path, headers, and timestamp in JSON format.
 func (bh *BasicHandlers) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	response := common.Response{
 		Message:   "Hello from HTTP management server!",
@@ -46,7 +51,8 @@ func (bh *BasicHandlers) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Handled request: %s %s", r.Method, r.URL.Path)
 }
 
-// HandleAPITest handles the API test endpoint
+// HandleAPITest handles the /api/test endpoint for API connectivity testing.
+// It returns a success message with request details in JSON format.
 func (bh *BasicHandlers) HandleAPITest(w http.ResponseWriter, r *http.Request) {
 	response := common.Response{
 		Message:   "API test successful!",
@@ -66,7 +72,8 @@ func (bh *BasicHandlers) HandleAPITest(w http.ResponseWriter, r *http.Request) {
 	log.Printf("API test request: %s %s", r.Method, r.URL.Path)
 }
 
-// HandleHealth handles the health check endpoint
+// HandleHealth handles the /health endpoint for health checks.
+// It returns a JSON response indicating the service is healthy.
 func (bh *BasicHandlers) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"status":    "healthy",

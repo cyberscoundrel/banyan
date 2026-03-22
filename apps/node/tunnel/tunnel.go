@@ -1,3 +1,14 @@
+// Package tunnel provides TCP tunneling over libp2p streams, enabling peers to
+// forward TCP connections through the libp2p network. This allows accessing services
+// on a remote peer's local network as if they were directly accessible.
+//
+// The package implements a simple request-response protocol:
+//  1. The initiator opens a libp2p stream and sends a TunnelRequest specifying the target host and port
+//  2. The responder connects to the local TCP target and sends a TunnelResponse
+//  3. If successful, the stream becomes a bidirectional pipe between initiator and target
+//
+// Security is enforced through target whitelisting - by default only localhost targets
+// are allowed, but this can be configured via SetAllowedTargets.
 package tunnel
 
 import (
@@ -15,22 +26,24 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
-// Protocol ID for TCP tunneling between peers
+// ProtocolID is the libp2p protocol identifier for TCP tunneling.
 const ProtocolID = protocol.ID("/banyan/tcp-tunnel/1.0.0")
 
-// TunnelRequest is sent by the initiator to request a tunnel to a target
+// TunnelRequest represents a request to establish a tunnel to a target host and port.
 type TunnelRequest struct {
 	TargetHost string
 	TargetPort uint16
 }
 
-// TunnelResponse indicates success or failure of tunnel setup
+// TunnelResponse indicates the result of a tunnel establishment request.
 type TunnelResponse struct {
 	Success bool
 	Error   string
 }
 
-// Handler manages TCP tunnel streams
+// Handler manages TCP tunnel streams, handling both incoming tunnel requests
+// and outgoing tunnel establishment. It enforces target access controls and
+// provides bidirectional data relay between libp2p streams and TCP connections.
 type Handler struct {
 	host           host.Host
 	ctx            context.Context
@@ -39,7 +52,9 @@ type Handler struct {
 	mu             sync.RWMutex
 }
 
-// NewHandler creates a new tunnel handler and registers the stream handler
+// NewHandler creates a new tunnel handler and registers the stream handler with
+// the provided libp2p host. The logf function is used for logging; if nil, a
+// no-op logger is used.
 func NewHandler(h host.Host, ctx context.Context, logf func(format string, v ...interface{})) *Handler {
 	if logf == nil {
 		logf = func(format string, v ...interface{}) {}
@@ -53,8 +68,9 @@ func NewHandler(h host.Host, ctx context.Context, logf func(format string, v ...
 	return handler
 }
 
-// SetAllowedTargets sets the list of allowed target hosts/patterns
-// If empty, only localhost targets are allowed
+// SetAllowedTargets configures the list of allowed target hosts for incoming
+// tunnel requests. Use "*" to allow all targets. If the list is empty, only
+// localhost targets (localhost, 127.0.0.1, ::1) are permitted.
 func (h *Handler) SetAllowedTargets(targets []string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -191,7 +207,9 @@ func (h *Handler) isAllowedTarget(targetHost string) bool {
 	return false
 }
 
-// OpenTunnel opens a tunnel stream to a peer and requests forwarding to target
+// OpenTunnel establishes a tunnel to the specified target via a remote peer.
+// The returned stream can be used for bidirectional communication with the target.
+// Returns an error if the peer rejects the tunnel request or connection fails.
 func (h *Handler) OpenTunnel(peerID peer.ID, targetHost string, targetPort uint16) (network.Stream, error) {
 	s, err := h.host.NewStream(h.ctx, peerID, ProtocolID)
 	if err != nil {

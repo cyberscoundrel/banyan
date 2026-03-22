@@ -1,0 +1,7 @@
+{
+  "serviceAlias": "test-service",
+  "root": {
+    "path": "/",
+    "keys": ["test-key-1", "test-key-2"]
+  }
+}

@@ -1,3 +1,17 @@
+// Package sdk provides a client library for building Banyan addon processes.
+// It handles JSON-RPC 2.0 communication over stdin/stdout with the host addon manager,
+// HTTP request forwarding, endpoint registration, and alias resolution.
+//
+// Addons are spawned by the host process and communicate via stdin/stdout using JSON-RPC.
+// The SDK Client handles the protocol details, allowing addon authors to focus on
+// implementing HTTP handlers and optional alias resolvers.
+//
+// Basic usage:
+//
+//	client := sdk.New()
+//	mux := sdk.NewMux()
+//	mux.GET("/my-addon/hello", http.HandlerFunc(handleHello))
+//	client.RunMux(mux)
 package sdk
 
 import (
@@ -14,7 +28,8 @@ import (
 	"time"
 )
 
-// HTTPRequest represents a forwarded HTTP request from the host.
+// HTTPRequest represents a forwarded HTTP request received from the host manager.
+// Body content is base64-encoded; PathParams contains any extracted path parameters.
 type HTTPRequest struct {
 	Method     string              `json:"method"`
 	Path       string              `json:"path"`
@@ -24,17 +39,22 @@ type HTTPRequest struct {
 	PathParams map[string]string   `json:"path_params,omitempty"`
 }
 
-// HTTPResponse is returned by addon handlers to the host.
+// HTTPResponse is the response structure returned by addon handlers to the host.
+// Body content should be base64-encoded; Status defaults to 200 if not set.
 type HTTPResponse struct {
 	Status     int                 `json:"status"`
 	Headers    map[string][]string `json:"headers,omitempty"`
 	BodyBase64 string              `json:"body_base64,omitempty"`
 }
 
-// Handler handles a forwarded HTTP request.
+// Handler is the function signature for processing forwarded HTTP requests.
+// Implementations return an HTTPResponse or an error.
 type Handler func(r *HTTPRequest) (*HTTPResponse, error)
 
-// Endpoint describes a registration for an endpoint.
+// Endpoint describes an HTTP endpoint registration for the addon.
+// Kind is "local" (management server) or "remote" (p2p server).
+// Method is the HTTP method or "*" for all methods.
+// Path supports trailing {param} placeholders for path parameters.
 type Endpoint struct {
 	Kind   string // "local" or "remote"
 	Method string // GET/POST/etc, or "*"
@@ -61,7 +81,8 @@ type rpcRequest struct {
 	Params  json.RawMessage `json:"params,omitempty"`
 }
 
-// Client wires stdin/stdout JSON-RPC and dispatches addon handlers.
+// Client manages communication with the host addon manager via JSON-RPC over stdin/stdout.
+// It dispatches incoming HTTP requests to registered handlers and manages alias resolvers.
 type Client struct {
 	enc     *json.Encoder
 	dec     *json.Decoder
@@ -79,7 +100,7 @@ type Client struct {
 	resolversEx []func(string) (string, string, error)
 }
 
-// New creates a new addon SDK client bound to stdin/stdout.
+// New creates a new Client bound to stdin for input and stdout for output.
 func New() *Client {
 	return &Client{
 		enc:      json.NewEncoder(os.Stdout),
@@ -88,7 +109,9 @@ func New() *Client {
 	}
 }
 
-// Run enters the main loop. It blocks until EOF or fatal decode error.
+// Run starts the main message processing loop and registers the provided endpoints.
+// It blocks until EOF on stdin or a fatal decode error. Endpoints are registered
+// after receiving the "host_ready" notification from the manager.
 func (c *Client) Run(endpoints ...Endpoint) error {
 	c.mu.Lock()
 	if c.started {
@@ -268,7 +291,8 @@ func (c *Client) writeError(id json.RawMessage, code int, msg string) {
 
 // Convenience helpers
 
-// Text returns a simple text/plain response.
+// Text creates a text/plain HTTPResponse with the given status code and body.
+// If status is 0, http.StatusOK (200) is used.
 func Text(status int, body string) *HTTPResponse {
 	if status == 0 {
 		status = http.StatusOK
@@ -280,7 +304,8 @@ func Text(status int, body string) *HTTPResponse {
 	}
 }
 
-// JSON returns application/json response for any marshaled value.
+// JSON creates an application/json HTTPResponse by marshaling the provided value.
+// If status is 0, http.StatusOK (200) is used.
 func JSON(status int, v any) *HTTPResponse {
 	if status == 0 {
 		status = http.StatusOK
@@ -295,7 +320,8 @@ func JSON(status int, v any) *HTTPResponse {
 
 func stringTrimQuotes(b json.RawMessage) string { var s string; _ = json.Unmarshal(b, &s); return s }
 
-// RunMux is a convenience that runs the SDK using a Mux definition.
+// RunMux is a convenience method that runs the Client using routes from a Mux.
+// If m is nil, an empty Mux is used.
 func (c *Client) RunMux(m *Mux) error {
 	if m == nil {
 		m = NewMux()
@@ -304,14 +330,14 @@ func (c *Client) RunMux(m *Mux) error {
 	return c.Run(eps...)
 }
 
-// ManagerClient provides direct HTTP access to the management server.
+// ManagerClient provides HTTP client access to the management server.
 type ManagerClient struct {
 	baseURL string
 	http    *http.Client
 }
 
-// Manager returns a client bound to the management server based on env vars.
-// It reads BANYAN_MGMT_URL; if not set, returns nil.
+// Manager returns a ManagerClient configured from the BANYAN_MGMT_URL environment variable.
+// Returns nil if the environment variable is not set.
 func (c *Client) Manager() *ManagerClient {
 	base := os.Getenv("BANYAN_MGMT_URL")
 	if base == "" {
@@ -320,7 +346,7 @@ func (c *Client) Manager() *ManagerClient {
 	return &ManagerClient{baseURL: strings.TrimRight(base, "/"), http: &http.Client{Timeout: 30 * time.Second}}
 }
 
-// Get issues a GET request to the management server with a relative path.
+// Get issues a GET request to the management server at the given relative path.
 func (m *ManagerClient) Get(path string) (*http.Response, error) {
 	if m == nil {
 		return nil, errors.New("manager client not configured")
@@ -329,7 +355,7 @@ func (m *ManagerClient) Get(path string) (*http.Response, error) {
 	return m.http.Get(url)
 }
 
-// PostJSON issues a POST with JSON body to the management server with a relative path.
+// PostJSON issues a POST request with a JSON body to the management server at the given relative path.
 func (m *ManagerClient) PostJSON(path string, body any) (*http.Response, error) {
 	if m == nil {
 		return nil, errors.New("manager client not configured")
@@ -343,8 +369,8 @@ func (m *ManagerClient) PostJSON(path string, body any) (*http.Response, error) 
 
 // Alias resolver API
 
-// AddAliasResolver registers a function that can resolve an alias to a file path.
-// The first resolver that returns a non-empty path with nil error wins.
+// AddAliasResolver registers a function that resolves an alias to a file path.
+// Resolvers are tried in registration order; the first to return a non-empty path wins.
 func (c *Client) AddAliasResolver(fn func(alias string) (string, error)) {
 	if fn == nil {
 		return
@@ -354,8 +380,8 @@ func (c *Client) AddAliasResolver(fn func(alias string) (string, error)) {
 	c.aliasMu.Unlock()
 }
 
-// AddAliasResolverEx registers a resolver that can return a file path or raw JSON.
-// If both are returned, the path takes precedence at the host when both are provided.
+// AddAliasResolverEx registers an extended resolver that can return a path or raw JSON.
+// When both are returned, path takes precedence at the host.
 func (c *Client) AddAliasResolverEx(fn func(alias string) (path string, json string, err error)) {
 	if fn == nil {
 		return
@@ -454,8 +480,8 @@ func (c *Client) runAliasResolvers(alias string) (path string, rawJSON string, e
 	return "", "", err
 }
 
-// Disclose sends public-facing addon information to the host so it can be included in greetings.
-// Name is required; if empty, the disclosure will be ignored by the host.
+// Disclose sends addon metadata to the host for inclusion in network greetings.
+// Name is required; version and info are optional. Returns an error if name is empty.
 func (c *Client) Disclose(name, version string, info map[string]interface{}) error {
 	if strings.TrimSpace(name) == "" {
 		return errors.New("name is required for disclosure")

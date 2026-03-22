@@ -48,6 +48,7 @@ const docSections: DocSection[] = [
     name: 'API Reference',
     icon: Code2,
     items: [
+      { name: 'Package Reference', href: '/docs/api' },
       { name: 'REST API', href: '/docs/api/rest' },
       { name: 'WebSocket Events', href: '/docs/api/websocket' },
       { name: 'CLI Reference', href: '/docs/api/cli' },
