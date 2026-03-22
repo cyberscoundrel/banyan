@@ -13,6 +13,15 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
+// TestTwoPeersConnect tests that two libp2p hosts can establish a direct connection.
+//
+// WHAT IT IS DOING:
+//   Creates two libp2p hosts on localhost, connects h1 to h2 using peer info,
+//   and verifies bidirectional connectivity.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that both hosts report Connected status to each other
+//   after the connection is established.
 func TestTwoPeersConnect(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -49,6 +58,15 @@ func TestTwoPeersConnect(t *testing.T) {
 	t.Logf("Successfully connected peer %s to peer %s", h1.ID().String()[:8], h2.ID().String()[:8])
 }
 
+// TestServiceDiscovery tests peer connection for service discovery scenarios.
+//
+// WHAT IT IS DOING:
+//   Creates two libp2p hosts, establishes a connection between them,
+//   and verifies the connection can be used for service discovery.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that h1 is connected to h2 and that there is at least
+//   one active connection to the peer.
 func TestServiceDiscovery(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -88,6 +106,15 @@ func TestServiceDiscovery(t *testing.T) {
 	t.Logf("Connection established with %d connection(s)", len(conns))
 }
 
+// TestTunnelProtocol tests the infrastructure for tunnel-based communication.
+//
+// WHAT IT IS DOING:
+//   Creates two connected libp2p hosts and starts a local TCP echo server
+//   to simulate tunnel endpoint behavior.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the hosts can connect and the echo server starts
+//   successfully on a local port, providing infrastructure for tunnel tests.
 func TestTunnelProtocol(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -138,6 +165,15 @@ func TestTunnelProtocol(t *testing.T) {
 	_ = echoPort
 }
 
+// TestMultiplePeersConnect tests mesh connectivity between multiple peers.
+//
+// WHAT IT IS DOING:
+//   Creates three libp2p hosts and connects each peer to every other peer
+//   to form a fully connected mesh topology.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that all n*(n-1)/2 expected connections are established
+//   and each peer reports Connected status to all others.
 func TestMultiplePeersConnect(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -186,6 +222,15 @@ func TestMultiplePeersConnect(t *testing.T) {
 	t.Logf("Successfully connected %d peers with %d connections", numPeers, connectedCount)
 }
 
+// TestPeerDisconnection tests that closing a host triggers disconnection detection.
+//
+// WHAT IT IS DOING:
+//   Creates two connected libp2p hosts, verifies they are connected,
+//   then closes h2 and waits to allow disconnection detection.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the peers are initially connected, and after closing h2,
+//   the test completes without error (verifying the disconnection flow).
 func TestPeerDisconnection(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

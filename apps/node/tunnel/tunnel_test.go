@@ -12,6 +12,18 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
+// TestIsAllowedTarget tests the target access control logic for tunnel
+// connections.
+//
+// WHAT IT IS DOING:
+//   Creates a tunnel handler and tests various target addresses against
+//   different allowed target configurations including nil (default),
+//   wildcard, and explicit target lists.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that localhost addresses (localhost, 127.0.0.1, ::1) are allowed
+//   by default, external addresses are denied by default, wildcard allows
+//   all targets, and explicit target lists work correctly.
 func TestIsAllowedTarget(t *testing.T) {
 	ctx := context.Background()
 	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
@@ -50,6 +62,18 @@ func TestIsAllowedTarget(t *testing.T) {
 	}
 }
 
+// TestTunnelProtocol tests the full tunnel protocol flow between two
+// libp2p hosts.
+//
+// WHAT IT IS DOING:
+//   Creates two connected libp2p hosts, sets up a TCP echo server on localhost,
+//   configures the target handler to allow localhost connections, and opens
+//   a tunnel from one host to the other to reach the echo server.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that a tunnel stream can be opened successfully, data can be
+//   written through the tunnel, and the echo response matches the original
+//   data sent.
 func TestTunnelProtocol(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -132,6 +156,17 @@ func TestTunnelProtocol(t *testing.T) {
 	}
 }
 
+// TestTunnelTargetDenied tests that tunnel connections to non-allowed
+// targets are properly rejected.
+//
+// WHAT IT IS DOING:
+//   Creates two connected libp2p hosts with the default (localhost-only)
+//   allowed targets configuration and attempts to open a tunnel to an
+//   external address (google.com).
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that opening a tunnel to a denied target returns an error,
+//   confirming that access control is enforced.
 func TestTunnelTargetDenied(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -154,6 +189,18 @@ func TestTunnelTargetDenied(t *testing.T) {
 	}
 }
 
+// TestTunnelConcurrentStreams tests that multiple tunnel streams can be
+// opened and used concurrently without issues.
+//
+// WHAT IT IS DOING:
+//   Creates two connected libp2p hosts, sets up a TCP echo server, and
+//   opens multiple concurrent tunnel streams (5 by default) from one host
+//   to the other, each sending unique data.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that all concurrent streams open successfully, each stream's
+//   data is echoed back correctly without cross-stream interference, and
+//   no errors occur during concurrent operations.
 func TestTunnelConcurrentStreams(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -240,6 +287,17 @@ func TestTunnelConcurrentStreams(t *testing.T) {
 	}
 }
 
+// TestTunnelStreamClose tests that tunnel streams can be properly closed
+// and that operations on closed streams fail appropriately.
+//
+// WHAT IT IS DOING:
+//   Creates two connected libp2p hosts, sets up a TCP echo server, opens
+//   a tunnel stream, sends and receives data, then closes the stream and
+//   attempts to write to it again.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that data can be sent and received before closing, the stream
+//   closes without error, and writing to a closed stream returns an error.
 func TestTunnelStreamClose(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

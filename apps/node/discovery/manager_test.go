@@ -14,6 +14,15 @@ import (
 	"banyan/types"
 )
 
+// TestNewManager tests the creation of a new discovery Manager.
+//
+// WHAT IT IS DOING:
+//   Creates a libp2p host with a local listener, initializes a GossipSub pubsub system,
+//   and constructs a new Manager instance with a mock event broadcaster.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Verifies that the NewManager function returns a non-nil manager instance,
+//   confirming successful initialization of all discovery components.
 func TestNewManager(t *testing.T) {
 	ctx := context.Background()
 	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
@@ -36,6 +45,15 @@ func TestNewManager(t *testing.T) {
 	}
 }
 
+// TestIsDHTEnabled tests the DHT enabled status reporting of the Manager.
+//
+// WHAT IT IS DOING:
+//   Creates a Manager with DHT disabled (noDHT=true) and another with DHT enabled
+//   (noDHT=false), then queries each manager's DHT status via IsDHTEnabled.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that IsDHTEnabled returns false when DHT is disabled and true when enabled,
+//   confirming the Manager correctly tracks and reports its DHT configuration.
 func TestIsDHTEnabled(t *testing.T) {
 	ctx := context.Background()
 	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
@@ -66,6 +84,15 @@ func TestIsDHTEnabled(t *testing.T) {
 	})
 }
 
+// TestGetDiscoveryMethods tests the retrieval of configured discovery methods.
+//
+// WHAT IT IS DOING:
+//   Creates a Manager with DHT disabled but other discovery methods enabled,
+//   then calls GetDiscoveryMethods to retrieve the list of active discovery mechanisms.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Verifies that at least one discovery method is returned, confirming the Manager
+//   properly exposes its configured discovery mechanisms (e.g., mDNS, pubsub, etc.).
 func TestGetDiscoveryMethods(t *testing.T) {
 	ctx := context.Background()
 	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
@@ -88,6 +115,17 @@ func TestGetDiscoveryMethods(t *testing.T) {
 	}
 }
 
+// TestHandleLookupRequest tests the handling of incoming peer lookup requests.
+//
+// WHAT IT IS DOING:
+//   Creates a Manager with mock dependencies, constructs a LookupRequest with test
+//   peer ID and public key data, then invokes HandleLookupRequest with a mock
+//   crypto manager and peer manager.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   The test completes without panicking or erroring, demonstrating that
+//   HandleLookupRequest can process incoming lookup requests and interact
+//   with the crypto and peer management subsystems.
 func TestHandleLookupRequest(t *testing.T) {
 	ctx := context.Background()
 	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
@@ -119,6 +157,17 @@ func TestHandleLookupRequest(t *testing.T) {
 	manager.HandleLookupRequest(req, fromPeer, mockCryptoManager, mockPeerManager)
 }
 
+// TestProcessLookupResponse tests the processing of received lookup responses.
+//
+// WHAT IT IS DOING:
+//   Creates a Manager with a mock peer manager, constructs a LookupResponse
+//   containing peer addresses and public key information, then calls
+//   ProcessLookupResponse to handle the response data.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   The test completes successfully, confirming that ProcessLookupResponse
+//   can parse and process lookup response data including peer addresses
+//   and public keys without errors.
 func TestProcessLookupResponse(t *testing.T) {
 	ctx := context.Background()
 	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
@@ -148,6 +197,16 @@ func TestProcessLookupResponse(t *testing.T) {
 	manager.ProcessLookupResponse(resp, mockPeerManager)
 }
 
+// TestVerifyResponseSignature tests the signature verification for lookup responses.
+//
+// WHAT IT IS DOING:
+//   Creates a Manager and tests VerifyResponseSignature with a LookupResponse
+//   that has an empty signature slice, which should fail verification.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that VerifyResponseSignature returns false for responses with
+//   empty signatures, confirming the method properly validates that
+//   signatures must be present and non-empty to pass verification.
 func TestVerifyResponseSignature(t *testing.T) {
 	ctx := context.Background()
 	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))

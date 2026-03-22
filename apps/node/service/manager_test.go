@@ -50,6 +50,15 @@ func generateTestKey(t *testing.T) crypto.PrivKey {
 	return priv
 }
 
+// TestCreateServiceBeacon tests the creation of a service beacon.
+//
+// WHAT IT IS DOING:
+//   Creates a new service beacon using a generated private key and verifies
+//   that the beacon is properly registered with the manager.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the beacon is non-nil, has Announce mode by default,
+//   has the correct service key set, and appears in the manager's beacon list.
 func TestCreateServiceBeacon(t *testing.T) {
 	manager, h, _, _, _, _ := setupTestManager(t)
 	defer h.Close()
@@ -83,6 +92,15 @@ func TestCreateServiceBeacon(t *testing.T) {
 	}
 }
 
+// TestServiceBeaconStartStop tests the lifecycle of starting and stopping a service beacon.
+//
+// WHAT IT IS DOING:
+//   Creates a service beacon, starts it, waits briefly, then stops it
+//   while verifying the context remains valid throughout.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that Start() and Stop() complete without error and that
+//   the context is not cancelled unexpectedly during operation.
 func TestServiceBeaconStartStop(t *testing.T) {
 	manager, h, _, _, _, ctx := setupTestManager(t)
 	defer h.Close()
@@ -115,6 +133,16 @@ func TestServiceBeaconStartStop(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 }
 
+// TestProcessServiceResponse tests handling of incoming service responses.
+//
+// WHAT IT IS DOING:
+//   Tests various scenarios for processing service responses including
+//   plaintext responses with addresses, missing peer IDs, encrypted responses
+//   with missing fields, and valid peer IDs that trigger connection attempts.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Each subtest verifies that ProcessServiceResponse handles different
+//   response configurations correctly without panicking or causing errors.
 func TestProcessServiceResponse(t *testing.T) {
 	t.Run("plaintext response with addresses", func(t *testing.T) {
 		manager, h, _, _, _, ctx := setupTestManager(t)
@@ -207,6 +235,15 @@ func TestProcessServiceResponse(t *testing.T) {
 	})
 }
 
+// TestCreateServiceBeaconWithMeta tests creating a service beacon with metadata.
+//
+// WHAT IT IS DOING:
+//   Creates a service beacon with an alias and fig templates,
+//   then verifies the metadata is correctly stored.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that GetAlias() returns the provided alias, GetFigTemplates()
+//   returns the correct templates, and the beacon appears in the list.
 func TestCreateServiceBeaconWithMeta(t *testing.T) {
 	manager, h, _, _, _, _ := setupTestManager(t)
 	defer h.Close()
@@ -245,6 +282,16 @@ func TestCreateServiceBeaconWithMeta(t *testing.T) {
 	}
 }
 
+// TestExtractPeerIDFromServiceRequest tests extracting peer IDs from service lookup requests.
+//
+// WHAT IT IS DOING:
+//   Tests multiple scenarios: plaintext requests, encrypted requests with
+//   crypto disabled, encrypted requests without service keys, encrypted
+//   requests with service keys, and fallback to plaintext fields.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Each subtest verifies that ExtractPeerIDFromServiceRequest returns
+//   the expected peer ID based on the request configuration and crypto state.
 func TestExtractPeerIDFromServiceRequest(t *testing.T) {
 	t.Run("plaintext request", func(t *testing.T) {
 		manager, h, _, _, _, _ := setupTestManager(t)
@@ -360,6 +407,15 @@ func TestExtractPeerIDFromServiceRequest(t *testing.T) {
 	})
 }
 
+// TestStartServiceLocator tests starting a service locator for a service key.
+//
+// WHAT IT IS DOING:
+//   Starts a service locator with a public key in Lookup mode and
+//   attempts to start a duplicate locator to verify duplicate prevention.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the first locator starts successfully and is registered,
+//   and that attempting to start a duplicate returns an error.
 func TestStartServiceLocator(t *testing.T) {
 	manager, h, _, _, _, _ := setupTestManager(t)
 	defer h.Close()
@@ -384,6 +440,15 @@ func TestStartServiceLocator(t *testing.T) {
 	}
 }
 
+// TestMultipleBeacons tests creating and managing multiple service beacons.
+//
+// WHAT IT IS DOING:
+//   Creates two service beacons with different keys and verifies
+//   they are both properly tracked by the manager.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that ListServiceBeacons returns both beacons, GetServiceBeacon
+//   returns one of them, and each beacon has a unique service key.
 func TestMultipleBeacons(t *testing.T) {
 	manager, h, _, _, _, _ := setupTestManager(t)
 	defer h.Close()
@@ -420,6 +485,15 @@ func TestMultipleBeacons(t *testing.T) {
 	}
 }
 
+// TestBeaconModeOperations tests changing and retrieving beacon modes.
+//
+// WHAT IT IS DOING:
+//   Creates a beacon and cycles through different modes (Announce, Lookup,
+//   ReplyOnly) using SetMode and GetMode.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the initial mode is Announce, and that SetMode correctly
+//   updates the mode which is then reflected by GetMode.
 func TestBeaconModeOperations(t *testing.T) {
 	manager, h, _, _, _, _ := setupTestManager(t)
 	defer h.Close()
@@ -446,6 +520,15 @@ func TestBeaconModeOperations(t *testing.T) {
 	}
 }
 
+// TestBeaconPeers tests peer management within a service beacon.
+//
+// WHAT IT IS DOING:
+//   Creates a beacon, verifies it starts with no peers, then manually
+//   adds a peer and verifies it can be retrieved.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that GetPeers returns an empty list initially, and after
+//   adding a peer, returns a list containing that peer.
 func TestBeaconPeers(t *testing.T) {
 	manager, h, _, _, _, _ := setupTestManager(t)
 	defer h.Close()
@@ -480,6 +563,15 @@ func TestBeaconPeers(t *testing.T) {
 	}
 }
 
+// TestCreateServiceBeaconWithMetaEmpty tests creating a beacon with empty metadata.
+//
+// WHAT IT IS DOING:
+//   Creates a service beacon with an empty alias and nil templates
+//   to verify the handler gracefully accepts empty metadata.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that GetAlias returns an empty string and GetFigTemplates
+//   returns nil or an empty slice without causing errors.
 func TestCreateServiceBeaconWithMetaEmpty(t *testing.T) {
 	manager, h, _, _, _, _ := setupTestManager(t)
 	defer h.Close()
@@ -501,6 +593,15 @@ func TestCreateServiceBeaconWithMetaEmpty(t *testing.T) {
 	}
 }
 
+// TestExtractPeerIDFromServiceRequestWithKey tests extracting peer IDs with a specific service key.
+//
+// WHAT IT IS DOING:
+//   Tests extracting peer IDs from both plaintext and encrypted requests
+//   using a specific service key, including handling nil keys.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Each subtest verifies that ExtractPeerIDFromServiceRequestWithKey
+//   returns the expected peer ID or empty string based on the key and request type.
 func TestExtractPeerIDFromServiceRequestWithKey(t *testing.T) {
 	t.Run("plaintext request", func(t *testing.T) {
 		manager, h, _, _, _, _ := setupTestManager(t)

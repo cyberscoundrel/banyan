@@ -7,6 +7,19 @@ import (
 	"time"
 )
 
+// TestCollectAllServiceKeys tests the CollectAllServiceKeys method of FigFile.
+//
+// WHAT IT IS DOING:
+//   Creates various FigFile structures with different key configurations at root
+//   and nested child levels, then calls CollectAllServiceKeys to gather all keys.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Verifies that the returned slice contains all expected keys in order,
+//   including keys from root, children, and deeply nested nodes.
+//
+// EXAMPLE:
+//   A FigFile with root key "root-key-1" and child key "api-key-1" returns
+//   []string{"root-key-1", "api-key-1"}.
 func TestCollectAllServiceKeys(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -146,6 +159,19 @@ func TestCollectAllServiceKeys(t *testing.T) {
 	}
 }
 
+// TestCollectKeysRecursive tests the internal collectKeysRecursive method of FigNode.
+//
+// WHAT IT IS DOING:
+//   Creates FigNode structures with varying key configurations and child nodes,
+//   then invokes the unexported collectKeysRecursive method to traverse and collect keys.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the collected keys slice matches the expected keys from the node
+//   and all its descendants, validating depth-first traversal behavior.
+//
+// EXAMPLE:
+//   A node with keys ["root-key"] and two children each having one key returns
+//   []string{"root-key", "child1-key", "child2-key"}.
 func TestCollectKeysRecursive(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -206,6 +232,19 @@ func TestCollectKeysRecursive(t *testing.T) {
 	}
 }
 
+// TestFindKeysForPath tests the FindKeysForPath method of FigFile.
+//
+// WHAT IT IS DOING:
+//   Constructs FigFile trees and queries them with various request paths
+//   to find the most specific keys associated with that path.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Verifies that exact matches return node-specific keys, partial matches
+//   return parent keys, and unknown paths fall back to root keys.
+//
+// EXAMPLE:
+//   Requesting "/api/users" on a tree with keys at "/api" returns the "/api" keys,
+//   not root keys, because "/api" is the closest matching ancestor.
 func TestFindKeysForPath(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -325,6 +364,19 @@ func TestFindKeysForPath(t *testing.T) {
 	}
 }
 
+// TestFindKeysAndMatchedPath tests the FindKeysAndMatchedPath method of FigFile.
+//
+// WHAT IT IS DOING:
+//   Queries FigFile structures with request paths and expects both the keys
+//   and the actual matched path (which may differ from the request path).
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that returned keys match expectations and that the matched path
+//   correctly reflects whether an exact or partial match occurred.
+//
+// EXAMPLE:
+//   Requesting "/api/users" on a tree with a node at "/api" returns
+//   keys=["api-key"] and matchedPath="/api" (partial match).
 func TestFindKeysAndMatchedPath(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -405,6 +457,19 @@ func TestFindKeysAndMatchedPath(t *testing.T) {
 	}
 }
 
+// TestBuildCanonicalPayload tests the BuildCanonicalPayload method of FigFile.
+//
+// WHAT IT IS DOING:
+//   Creates FigFile instances with various fields (ServiceAlias, ExpiresAt,
+//   RequesterPeerID, Nonce) and generates a canonical JSON payload for signing.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Verifies that the payload contains expected field values and that payloads
+//   are deterministic regardless of key slice ordering.
+//
+// EXAMPLE:
+//   Two FigFiles with keys in different orders ["key2", "key1"] vs ["key1", "key2"]
+//   produce identical canonical payloads.
 func TestBuildCanonicalPayload(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -511,6 +576,19 @@ func TestBuildCanonicalPayload(t *testing.T) {
 	})
 }
 
+// TestBuildAuthorityPayload tests the BuildAuthorityPayload method of FigFile.
+//
+// WHAT IT IS DOING:
+//   Creates FigFile instances containing fields like ServiceAlias, RequesterPeerID,
+//   Nonce, RequiredSigners, and ExpiresAt, then builds an authority-specific payload.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that authority-relevant fields (service alias, required signers, expiration)
+//   are included while request-specific fields (nonce, requester peer ID) are excluded.
+//
+// EXAMPLE:
+//   A FigFile with Nonce="abc123" produces a payload that does NOT contain "abc123",
+//   ensuring authority signatures are independent of single-request data.
 func TestBuildAuthorityPayload(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -578,6 +656,19 @@ func TestBuildAuthorityPayload(t *testing.T) {
 	}
 }
 
+// TestRouteTable tests the RouteTable type and its methods.
+//
+// WHAT IT IS DOING:
+//   Exercises RouteTable operations including AddRoute, GetRoute, GetAllRoutes,
+//   LoadRoutes, AddRouteWithConfig, GetRouteConfig, and concurrent access patterns.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Subtests verify: routes can be added and retrieved; non-existent routes return false;
+//   bulk loading works; route configs are preserved; and concurrent reads/writes are safe.
+//
+// EXAMPLE:
+//   Adding route "service1" -> "http://localhost:8080" followed by GetRoute("service1")
+//   returns ("http://localhost:8080", true).
 func TestRouteTable(t *testing.T) {
 	t.Run("Add and get route", func(t *testing.T) {
 		rt := NewRouteTable()
@@ -671,6 +762,19 @@ func TestRouteTable(t *testing.T) {
 	})
 }
 
+// TestFigNodeFindNodeForPath tests the FindNodeForPath method of FigFile.
+//
+// WHAT IT IS DOING:
+//   Creates FigFile trees with nested FigNodes and queries for nodes matching
+//   specific request paths, testing both exact and partial path matching.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Verifies that the returned node has the expected path and that the found
+//   boolean correctly indicates whether a match exists.
+//
+// EXAMPLE:
+//   Querying "/api/users" on a tree with nodes at "/" and "/api" returns
+//   the "/api" node with found=true (closest ancestor match).
 func TestFigNodeFindNodeForPath(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -751,6 +855,19 @@ func TestFigNodeFindNodeForPath(t *testing.T) {
 	}
 }
 
+// TestFigFileWithAllowedTransports tests the AllowedTransports field on FigNode.
+//
+// WHAT IT IS DOING:
+//   Creates a FigFile with a child node that has AllowedTransports set to
+//   ["tcp", "ws"], then retrieves the node via FindNodeForPath.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the AllowedTransports field is preserved and accessible
+//   on the retrieved node, confirming transport restrictions can be configured.
+//
+// EXAMPLE:
+//   A node with AllowedTransports=["tcp", "ws"] indicates only TCP and WebSocket
+//   connections are permitted for that path.
 func TestFigFileWithAllowedTransports(t *testing.T) {
 	fig := FigFile{
 		ServiceAlias: "restricted-service",
@@ -778,6 +895,19 @@ func TestFigFileWithAllowedTransports(t *testing.T) {
 	}
 }
 
+// TestFigFileWithData tests the custom Data field on FigFile.
+//
+// WHAT IT IS DOING:
+//   Creates a FigFile with a Data field containing arbitrary JSON (json.RawMessage)
+//   and verifies the data is stored without modification.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that string(fig.Data) matches the original JSON input, confirming
+//   that custom application data can be attached to a FigFile.
+//
+// EXAMPLE:
+//   Setting Data to `{"custom": "value"}` preserves the raw JSON for later use
+//   by service-specific logic.
 func TestFigFileWithData(t *testing.T) {
 	data := json.RawMessage(`{"custom": "value"}`)
 	fig := FigFile{

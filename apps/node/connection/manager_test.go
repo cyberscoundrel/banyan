@@ -70,6 +70,18 @@ func generateTestPeerID(t *testing.T) peer.ID {
 	return h.ID()
 }
 
+// TestAddTrackedPeer tests the AddTrackedPeer function for managing peer connections.
+//
+// WHAT IT IS DOING:
+//   Creates a Manager and adds peers with various connection options (manual, service,
+//   background), tests upgrading connection types, appending service keys, handling
+//   invalid connection types, and reconnecting previously disconnected peers.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Verifies that peers are added with correct properties (peer ID, connection type,
+//   HTTP capability, status, alias), connection types can be upgraded to higher priority,
+//   service keys are appended without duplicates, invalid types default to background,
+//   and disconnect status/timestamps are properly reset on reconnect.
 func TestAddTrackedPeer(t *testing.T) {
 	manager, _ := setupTestManager(t)
 	defer manager.host.Close()
@@ -197,6 +209,17 @@ func TestAddTrackedPeer(t *testing.T) {
 	})
 }
 
+// TestMarkPeerHTTPCapable tests marking peers as HTTP capable.
+//
+// WHAT IT IS DOING:
+//   Creates a Manager, adds a peer with HTTP capability disabled, then calls
+//   MarkPeerHTTPCapable to enable it. Also tests behavior with unknown peers
+//   and verifies event broadcasting.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that after marking, HTTPCapable and BidirectionalHTTP flags are true,
+//   HTTPTestResult is set to success, LastHTTPTest timestamp is set, an HTTP test
+//   event is broadcast, and unknown peers are not affected by the call.
 func TestMarkPeerHTTPCapable(t *testing.T) {
 	manager, _ := setupTestManager(t)
 	defer manager.host.Close()
@@ -250,6 +273,17 @@ func TestMarkPeerHTTPCapable(t *testing.T) {
 	})
 }
 
+// TestGetPeerByAlias tests peer lookup by 4-character alias.
+//
+// WHAT IT IS DOING:
+//   Creates a Manager, adds peers which are automatically assigned 4-character aliases,
+//   then uses GetPeerByAlias to resolve aliases back to peer IDs and tests
+//   uniqueness of generated aliases.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Verifies that valid aliases correctly resolve to their peer IDs, invalid aliases
+//   return false, all aliases are exactly 4 characters, and different peers receive
+//   unique aliases (tested with 10 peers).
 func TestGetPeerByAlias(t *testing.T) {
 	manager, _ := setupTestManager(t)
 	defer manager.host.Close()
@@ -297,6 +331,16 @@ func TestGetPeerByAlias(t *testing.T) {
 	})
 }
 
+// TestCleanupOldConnections tests the removal of stale disconnected peers.
+//
+// WHAT IT IS DOING:
+//   Creates a Manager, adds peers with various states (disconnected old, disconnected
+//   recent, connected), sets LastDisconnect timestamps, then calls CleanupOldConnections.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Verifies that peers disconnected for more than 30 minutes are removed, recently
+//   disconnected peers are retained, connected peers are always kept regardless of
+//   LastDisconnect timestamp, and alias mappings are removed when peers are cleaned up.
 func TestCleanupOldConnections(t *testing.T) {
 	manager, _ := setupTestManager(t)
 	defer manager.host.Close()
@@ -368,6 +412,16 @@ func TestCleanupOldConnections(t *testing.T) {
 	})
 }
 
+// TestHandleNewConnection tests handling of new peer connections.
+//
+// WHAT IT IS DOING:
+//   Creates a Manager with tracked peers in various states, calls HandleNewConnection
+//   when peers connect, and verifies status updates and event broadcasting.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Verifies that tracked peers have their status updated to connected, peer connected
+//   events are broadcast, untracked peers are not automatically added to tracking,
+//   and reconnected tracked peers trigger an info event with "Tracked peer reconnected".
 func TestHandleNewConnection(t *testing.T) {
 	manager, _ := setupTestManager(t)
 	defer manager.host.Close()
@@ -441,6 +495,16 @@ func TestHandleNewConnection(t *testing.T) {
 	})
 }
 
+// TestHandleDisconnection tests handling of peer disconnections.
+//
+// WHAT IT IS DOING:
+//   Creates a Manager with tracked peers, calls HandleDisconnection to simulate
+//   peer disconnect events, and verifies status updates, timestamps, and events.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Verifies that disconnected peers have their status changed to disconnected,
+//   LastDisconnect timestamp is set to the current time, and peer disconnected
+//   events are broadcast to subscribers via the event broadcaster.
 func TestHandleDisconnection(t *testing.T) {
 	manager, _ := setupTestManager(t)
 	defer manager.host.Close()

@@ -11,6 +11,16 @@ import (
 	"banyan/interfaces"
 )
 
+// TestCryptoManagerInterface tests that the CryptoManager correctly implements
+// the CryptoManager interface and handles the absence of a service key.
+//
+// WHAT IT IS DOING:
+//   Creates a CryptoManager without a service key and verifies the initial
+//   state of service key related methods.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that HasServiceKey() returns false and GetServiceKey() returns nil
+//   when no service key is provided during initialization.
 func TestCryptoManagerInterface(t *testing.T) {
 	// Generate test keys
 	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
@@ -42,6 +52,16 @@ func TestCryptoManagerInterface(t *testing.T) {
 	t.Log("CryptoManager interface test passed")
 }
 
+// TestCryptoManagerWithServiceKey tests that the CryptoManager correctly
+// stores and retrieves a service key when one is provided.
+//
+// WHAT IT IS DOING:
+//   Creates a CryptoManager with a service key and verifies that the key
+//   is properly stored and accessible.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that HasServiceKey() returns true, GetServiceKey() returns a
+//   non-nil key, and the retrieved key matches the one provided during initialization.
 func TestCryptoManagerWithServiceKey(t *testing.T) {
 	// Generate test keys
 	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
@@ -82,6 +102,18 @@ func TestCryptoManagerWithServiceKey(t *testing.T) {
 	t.Log("CryptoManager with service key test passed")
 }
 
+// TestMultipleServiceKeys tests the registration, retrieval, listing, and
+// unregistration of multiple named service keys.
+//
+// WHAT IT IS DOING:
+//   Creates a CryptoManager and registers two service keys with different IDs,
+//   then verifies each can be retrieved independently, listed together, and
+//   unregistered without affecting the other.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that HasServiceKeyByID() and GetServiceKeyByID() work correctly
+//   for each key, ListServiceKeys() returns all registered keys, and after
+//   unregistering one key, the other remains accessible.
 func TestMultipleServiceKeys(t *testing.T) {
 	// Generate test keys
 	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
@@ -201,6 +233,16 @@ func TestMultipleServiceKeys(t *testing.T) {
 	t.Log("Multiple service keys test passed")
 }
 
+// TestDecryptPeerIDWithSpecificServiceKey tests the error handling of
+// DecryptPeerIDWithSpecificServiceKey when called with a nil service key.
+//
+// WHAT IT IS DOING:
+//   Creates a CryptoManager with a service key and attempts to decrypt
+//   a peer ID using a nil service key parameter.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that an error is returned containing "no service private key provided"
+//   when the service key parameter is nil.
 func TestDecryptPeerIDWithSpecificServiceKey(t *testing.T) {
 	// Generate test keys
 	servicePriv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
@@ -230,6 +272,16 @@ func TestDecryptPeerIDWithSpecificServiceKey(t *testing.T) {
 	t.Log("DecryptPeerIDWithSpecificServiceKey basic functionality test passed")
 }
 
+// TestEncryptDecryptWithPublicKey tests that data can be encrypted using
+// a public key and produces valid ciphertext and nonce.
+//
+// WHAT IT IS DOING:
+//   Creates a CryptoManager and encrypts test data using a randomly generated
+//   requester's public key.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the encryption succeeds without error and produces non-empty
+//   ciphertext and nonce values.
 func TestEncryptDecryptWithPublicKey(t *testing.T) {
 	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
 	if err != nil {
@@ -272,6 +324,16 @@ func TestEncryptDecryptWithPublicKey(t *testing.T) {
 	_ = requesterPriv
 }
 
+// TestEncryptDecryptWithServiceKey tests that data can be encrypted using
+// a service key and produces valid ciphertext and nonce.
+//
+// WHAT IT IS DOING:
+//   Creates a CryptoManager and encrypts test data using both a requester's
+//   public key and a service private key.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the encryption succeeds without error and produces non-empty
+//   ciphertext and nonce values.
 func TestEncryptDecryptWithServiceKey(t *testing.T) {
 	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
 	if err != nil {
@@ -317,6 +379,16 @@ func TestEncryptDecryptWithServiceKey(t *testing.T) {
 	}
 }
 
+// TestEncryptPeerIDWithServiceKey tests that a peer ID can be encrypted
+// using a service public key.
+//
+// WHAT IT IS DOING:
+//   Creates a CryptoManager and encrypts a test peer ID string using the
+//   service's public key.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the encryption succeeds without error and produces non-empty
+//   ciphertext and nonce values.
 func TestEncryptPeerIDWithServiceKey(t *testing.T) {
 	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
 	if err != nil {
@@ -354,6 +426,16 @@ func TestEncryptPeerIDWithServiceKey(t *testing.T) {
 	_ = servicePriv
 }
 
+// TestEncryptWithPublicKeyNoPrivateKey tests the behavior when a host
+// does not have a private key (which libp2p automatically generates).
+//
+// WHAT IT IS DOING:
+//   Creates a libp2p host without explicitly providing a private key
+//   and checks if the host's peerstore has a private key.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Skips the test if the host automatically generates a private key,
+//   which is the expected behavior in modern libp2p versions.
 func TestEncryptWithPublicKeyNoPrivateKey(t *testing.T) {
 	host, err := libp2p.New()
 	if err != nil {
@@ -366,6 +448,15 @@ func TestEncryptWithPublicKeyNoPrivateKey(t *testing.T) {
 	}
 }
 
+// TestEncryptWithServiceKeyNilKey tests the error handling when attempting
+// to encrypt with a nil service key.
+//
+// WHAT IT IS DOING:
+//   Creates a CryptoManager and attempts to encrypt data using a nil
+//   service private key.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that an error is returned when the service key parameter is nil.
 func TestEncryptWithServiceKeyNilKey(t *testing.T) {
 	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
 	if err != nil {
@@ -386,6 +477,16 @@ func TestEncryptWithServiceKeyNilKey(t *testing.T) {
 	}
 }
 
+// TestEncryptPeerIDWithServiceKeyNoPrivateKey tests the behavior when a host
+// does not have a private key for peer ID encryption.
+//
+// WHAT IT IS DOING:
+//   Creates a libp2p host without explicitly providing a private key
+//   and checks if the host's peerstore has a private key.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Skips the test if the host automatically generates a private key,
+//   which is the expected behavior in modern libp2p versions.
 func TestEncryptPeerIDWithServiceKeyNoPrivateKey(t *testing.T) {
 	_, servicePub, err := test.RandTestKeyPair(crypto.Ed25519, 256)
 	if err != nil {

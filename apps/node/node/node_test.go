@@ -9,6 +9,16 @@ import (
 	"banyan/testutil/builders"
 )
 
+// TestNewNode tests the creation of a new node with default configuration.
+//
+// WHAT IT IS DOING:
+//   Creates a node using the NodeBuilder and verifies that all
+//   core components are properly initialized.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that GetHost, GetConnectionManager, GetDiscoveryManager,
+//   GetServiceManager, GetHTTPHandler, GetHTTPTransport, GetEventBroadcaster,
+//   GetRouteTable, GetConfig return non-nil values and the host has a valid peer ID.
 func TestNewNode(t *testing.T) {
 	ctx := context.Background()
 
@@ -59,6 +69,15 @@ func TestNewNode(t *testing.T) {
 	}
 }
 
+// TestNodeStart tests starting a node and verifying post-start state.
+//
+// WHAT IT IS DOING:
+//   Creates and starts a node using BuildAndStart, then verifies
+//   that managers remain accessible after startup.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that GetDiscoveryManager, GetServiceManager, and GetHTTPHandler
+//   return non-nil values after the node has been started.
 func TestNodeStart(t *testing.T) {
 	ctx := context.Background()
 
@@ -83,6 +102,15 @@ func TestNodeStart(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 }
 
+// TestNodeClose tests the graceful shutdown of a node.
+//
+// WHAT IT IS DOING:
+//   Creates, starts, and then closes a node to verify that
+//   the shutdown process completes without errors.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that Close() can be called successfully after the node
+//   has been started and the host was initialized with a valid peer ID.
 func TestNodeClose(t *testing.T) {
 	ctx := context.Background()
 
@@ -104,6 +132,15 @@ func TestNodeClose(t *testing.T) {
 	_ = peerID
 }
 
+// TestNewNodeWithDHT tests creating a node with DHT enabled.
+//
+// WHAT IT IS DOING:
+//   Creates a node with DHT routing enabled and verifies the DHT
+//   routing table is accessible.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that GetDHTRoutingTableSize returns a non-negative value,
+//   indicating the DHT is initialized even if the table is empty.
 func TestNewNodeWithDHT(t *testing.T) {
 	ctx := context.Background()
 
@@ -120,6 +157,15 @@ func TestNewNodeWithDHT(t *testing.T) {
 	}
 }
 
+// TestNewNodeWithTunnel tests creating a node with tunnel functionality enabled.
+//
+// WHAT IT IS DOING:
+//   Creates a node with tunnel support enabled and verifies the
+//   tunnel handler is initialized.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that GetTunnelHandler returns a non-nil value when
+//   the tunnel option is enabled.
 func TestNewNodeWithTunnel(t *testing.T) {
 	ctx := context.Background()
 
@@ -136,6 +182,15 @@ func TestNewNodeWithTunnel(t *testing.T) {
 	}
 }
 
+// TestNewNodeWithoutTunnel tests creating a node with tunnel functionality disabled.
+//
+// WHAT IT IS DOING:
+//   Creates a node with tunnel support explicitly disabled and
+//   verifies the tunnel handler is not initialized.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that GetTunnelHandler returns nil when the tunnel
+//   option is disabled.
 func TestNewNodeWithoutTunnel(t *testing.T) {
 	ctx := context.Background()
 
@@ -152,6 +207,16 @@ func TestNewNodeWithoutTunnel(t *testing.T) {
 	}
 }
 
+// TestNodeInterfaceCompliance tests that node components implement their expected interfaces.
+//
+// WHAT IT IS DOING:
+//   Creates a node and assigns each component to its respective interface
+//   type to verify interface compliance at compile time.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that GetConnectionManager implements PeerManager, GetDiscoveryManager
+//   implements DiscoveryManager, GetServiceManager implements ServiceManager,
+//   GetHTTPHandler implements HTTPHandler, and GetEventBroadcaster implements EventBroadcaster.
 func TestNodeInterfaceCompliance(t *testing.T) {
 	ctx := context.Background()
 
@@ -168,6 +233,15 @@ func TestNodeInterfaceCompliance(t *testing.T) {
 	var _ interfaces.EventBroadcaster = node.GetEventBroadcaster()
 }
 
+// TestNodeConfigDefaults tests that the node builder sets expected default configuration values.
+//
+// WHAT IT IS DOING:
+//   Creates a node with default builder settings and verifies the
+//   configuration has the expected test defaults.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that DisableDHT is true and NoCrypto is true by default
+//   in the test builder configuration.
 func TestNodeConfigDefaults(t *testing.T) {
 	ctx := context.Background()
 
@@ -191,6 +265,16 @@ func TestNodeConfigDefaults(t *testing.T) {
 	}
 }
 
+// TestNodeNATStatus tests NAT-related status methods on the node.
+//
+// WHAT IT IS DOING:
+//   Creates a node and queries NAT reachability status and relay
+//   address information.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that GetNATReachability returns a non-empty string,
+//   and GetRelayAddrs returns an empty list for a test node
+//   (no relay addresses configured).
 func TestNodeNATStatus(t *testing.T) {
 	ctx := context.Background()
 
@@ -214,6 +298,15 @@ func TestNodeNATStatus(t *testing.T) {
 	}
 }
 
+// TestNodeDHTStatus tests DHT-related status methods on the node.
+//
+// WHAT IT IS DOING:
+//   Creates a node with DHT enabled and queries DHT readiness
+//   and routing table size.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that GetDHTRoutingTableSize returns a non-negative value
+//   when DHT is enabled.
 func TestNodeDHTStatus(t *testing.T) {
 	ctx := context.Background()
 
@@ -234,6 +327,15 @@ func TestNodeDHTStatus(t *testing.T) {
 	}
 }
 
+// TestNodeSendEvent tests sending events through the node's event broadcaster.
+//
+// WHAT IT IS DOING:
+//   Creates a node and sends a test event with a message payload
+//   through the event broadcasting system.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that GetEventBroadcaster returns a non-nil broadcaster
+//   and SendEvent completes without error.
 func TestNodeSendEvent(t *testing.T) {
 	ctx := context.Background()
 
@@ -253,6 +355,15 @@ func TestNodeSendEvent(t *testing.T) {
 	})
 }
 
+// TestNodeMultipleClose tests that calling Close multiple times is safe.
+//
+// WHAT IT IS DOING:
+//   Creates a node and calls Close() twice to verify that
+//   multiple close calls do not cause panics or errors.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the second Close() call completes without
+//   panicking or returning an error.
 func TestNodeMultipleClose(t *testing.T) {
 	ctx := context.Background()
 

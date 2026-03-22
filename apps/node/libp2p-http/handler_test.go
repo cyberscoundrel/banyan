@@ -57,6 +57,15 @@ func newTestHandler(t *testing.T) (*Handler, crypto.PrivKey) {
 	return handler, priv
 }
 
+// TestHandlePing tests the ping endpoint handler.
+//
+// WHAT IT IS DOING:
+//   Sends GET and POST requests to the /ping endpoint and verifies
+//   the response structure and content.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the response has status 200, Content-Type application/json,
+//   and contains status "ok", peer_id, method, and path fields.
 func TestHandlePing(t *testing.T) {
 	handler, _ := newTestHandler(t)
 
@@ -108,6 +117,15 @@ func TestHandlePing(t *testing.T) {
 	}
 }
 
+// TestHandleGreetings tests the greetings endpoint handler.
+//
+// WHAT IT IS DOING:
+//   Sends GET and POST requests to the /greetings endpoint and verifies
+//   the greeting response includes peer info, timestamp, and capabilities.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the response has status 200, contains peer_id, timestamp,
+//   and data with http_capable=true and has_service=false (without service key).
 func TestHandleGreetings(t *testing.T) {
 	handler, _ := newTestHandler(t)
 
@@ -175,6 +193,15 @@ func TestHandleGreetings(t *testing.T) {
 	}
 }
 
+// TestHandleGreetingsWithServiceKey tests the greetings endpoint with a service key configured.
+//
+// WHAT IT IS DOING:
+//   Creates a handler with a mock crypto manager that has a service key,
+//   then sends a greetings request to verify service-related fields.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the response includes service_key, has_service=true,
+//   and service_active=true when a service key is available.
 func TestHandleGreetingsWithServiceKey(t *testing.T) {
 	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
 	if err != nil {
@@ -242,6 +269,15 @@ func TestHandleGreetingsWithServiceKey(t *testing.T) {
 	}
 }
 
+// TestHandleGreetingsWithAddonDisclosure tests the greetings endpoint with addon disclosures.
+//
+// WHAT IT IS DOING:
+//   Configures an addon disclosure provider that returns addon information,
+//   including one with an empty name that should be filtered out.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the response data contains an addons array with only
+//   valid addons (empty-named addons are filtered out).
 func TestHandleGreetingsWithAddonDisclosure(t *testing.T) {
 	handler, _ := newTestHandler(t)
 
@@ -281,6 +317,14 @@ func TestHandleGreetingsWithAddonDisclosure(t *testing.T) {
 	}
 }
 
+// TestHandleGreetingsMethodNotAllowed tests that PUT requests to greetings are rejected.
+//
+// WHAT IT IS DOING:
+//   Sends a PUT request to the /greetings endpoint to verify
+//   method validation.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the response has status 405 Method Not Allowed.
 func TestHandleGreetingsMethodNotAllowed(t *testing.T) {
 	handler, _ := newTestHandler(t)
 
@@ -294,6 +338,15 @@ func TestHandleGreetingsMethodNotAllowed(t *testing.T) {
 	}
 }
 
+// TestHandleServiceFigs tests the service figs endpoint handler.
+//
+// WHAT IT IS DOING:
+//   Sends GET and POST requests to the /services/figs endpoint
+//   with a handler that has no beacons configured.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the response has status 200, Content-Type application/json,
+//   and contains peerId, time, and an empty services array.
 func TestHandleServiceFigs(t *testing.T) {
 	handler, _ := newTestHandler(t)
 
@@ -346,6 +399,15 @@ func TestHandleServiceFigs(t *testing.T) {
 	}
 }
 
+// TestHandleServiceFigsWithBeacon tests the service figs endpoint with an active beacon.
+//
+// WHAT IT IS DOING:
+//   Creates a handler with a mock service beacon and sends a POST request
+//   with nonce and requester peer ID to retrieve service information.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the response contains a services array with one service
+//   including alias, keys, and fig with serviceAlias.
 func TestHandleServiceFigsWithBeacon(t *testing.T) {
 	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
 	if err != nil {
@@ -437,6 +499,14 @@ func TestHandleServiceFigsWithBeacon(t *testing.T) {
 	}
 }
 
+// TestHandleServiceFigsMethodNotAllowed tests that PUT requests to service figs are rejected.
+//
+// WHAT IT IS DOING:
+//   Sends a PUT request to the /services/figs endpoint to verify
+//   method validation.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the response has status 405 Method Not Allowed.
 func TestHandleServiceFigsMethodNotAllowed(t *testing.T) {
 	handler, _ := newTestHandler(t)
 
@@ -450,6 +520,15 @@ func TestHandleServiceFigsMethodNotAllowed(t *testing.T) {
 	}
 }
 
+// TestHandleStatus tests the status endpoint handler.
+//
+// WHAT IT IS DOING:
+//   Sends a GET request to the /status endpoint to retrieve
+//   the current node status information.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the response has status 200, Content-Type application/json,
+//   and contains peer_id, status "running", timestamp, and addresses array.
 func TestHandleStatus(t *testing.T) {
 	handler, _ := newTestHandler(t)
 
@@ -492,6 +571,15 @@ func TestHandleStatus(t *testing.T) {
 	}
 }
 
+// TestHandleConnectionsStatus tests the connections status endpoint with active connections.
+//
+// WHAT IT IS DOING:
+//   Creates a handler with a mock connection manager containing one connection,
+//   then retrieves the connections status.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the response has status 200, count=1, and the connections
+//   array contains the expected peer with all connection details.
 func TestHandleConnectionsStatus(t *testing.T) {
 	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
 	if err != nil {
@@ -607,6 +695,15 @@ func TestHandleConnectionsStatus(t *testing.T) {
 	}
 }
 
+// TestHandleConnectionsStatusEmpty tests the connections status endpoint with no connections.
+//
+// WHAT IT IS DOING:
+//   Sends a GET request to the /connections endpoint with a handler
+//   that has no active connections.
+//
+// HOW IT DEMONSTRATES IT WORKS:
+//   Asserts that the response has status 200, count=0, and an empty
+//   connections array.
 func TestHandleConnectionsStatusEmpty(t *testing.T) {
 	handler, _ := newTestHandler(t)
 
