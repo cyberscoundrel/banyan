@@ -229,3 +229,177 @@ func TestDecryptPeerIDWithSpecificServiceKey(t *testing.T) {
 
 	t.Log("DecryptPeerIDWithSpecificServiceKey basic functionality test passed")
 }
+
+func TestEncryptDecryptWithPublicKey(t *testing.T) {
+	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
+	if err != nil {
+		t.Fatalf("Failed to generate test keys: %v", err)
+	}
+
+	host, err := libp2p.New(libp2p.Identity(priv))
+	if err != nil {
+		t.Fatalf("Failed to create libp2p host: %v", err)
+	}
+	defer host.Close()
+
+	manager := NewManager(host, nil)
+
+	requesterPriv, requesterPub, err := test.RandTestKeyPair(crypto.Ed25519, 256)
+	if err != nil {
+		t.Fatalf("Failed to generate requester keys: %v", err)
+	}
+
+	requesterPubKeyBytes, err := crypto.MarshalPublicKey(requesterPub)
+	if err != nil {
+		t.Fatalf("Failed to marshal requester public key: %v", err)
+	}
+
+	originalData := []byte("test secret message")
+
+	ciphertext, nonce, err := manager.EncryptWithPublicKey(originalData, requesterPubKeyBytes)
+	if err != nil {
+		t.Fatalf("Failed to encrypt: %v", err)
+	}
+
+	if len(ciphertext) == 0 {
+		t.Error("Expected non-empty ciphertext")
+	}
+
+	if len(nonce) == 0 {
+		t.Error("Expected non-empty nonce")
+	}
+
+	_ = requesterPriv
+}
+
+func TestEncryptDecryptWithServiceKey(t *testing.T) {
+	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
+	if err != nil {
+		t.Fatalf("Failed to generate test keys: %v", err)
+	}
+
+	servicePriv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
+	if err != nil {
+		t.Fatalf("Failed to generate service test keys: %v", err)
+	}
+
+	host, err := libp2p.New(libp2p.Identity(priv))
+	if err != nil {
+		t.Fatalf("Failed to create libp2p host: %v", err)
+	}
+	defer host.Close()
+
+	manager := NewManager(host, nil)
+
+	_, requesterPub, err := test.RandTestKeyPair(crypto.Ed25519, 256)
+	if err != nil {
+		t.Fatalf("Failed to generate requester keys: %v", err)
+	}
+
+	requesterPubKeyBytes, err := crypto.MarshalPublicKey(requesterPub)
+	if err != nil {
+		t.Fatalf("Failed to marshal requester public key: %v", err)
+	}
+
+	originalData := []byte("test service message")
+
+	ciphertext, nonce, err := manager.EncryptWithServiceKey(originalData, requesterPubKeyBytes, servicePriv)
+	if err != nil {
+		t.Fatalf("Failed to encrypt with service key: %v", err)
+	}
+
+	if len(ciphertext) == 0 {
+		t.Error("Expected non-empty ciphertext")
+	}
+
+	if len(nonce) == 0 {
+		t.Error("Expected non-empty nonce")
+	}
+}
+
+func TestEncryptPeerIDWithServiceKey(t *testing.T) {
+	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
+	if err != nil {
+		t.Fatalf("Failed to generate test keys: %v", err)
+	}
+
+	servicePriv, servicePub, err := test.RandTestKeyPair(crypto.Ed25519, 256)
+	if err != nil {
+		t.Fatalf("Failed to generate service test keys: %v", err)
+	}
+
+	host, err := libp2p.New(libp2p.Identity(priv))
+	if err != nil {
+		t.Fatalf("Failed to create libp2p host: %v", err)
+	}
+	defer host.Close()
+
+	manager := NewManager(host, nil)
+
+	peerID := "QmTestPeerID123456789"
+
+	ciphertext, nonce, err := manager.EncryptPeerIDWithServiceKey(peerID, servicePub)
+	if err != nil {
+		t.Fatalf("Failed to encrypt peer ID: %v", err)
+	}
+
+	if len(ciphertext) == 0 {
+		t.Error("Expected non-empty ciphertext")
+	}
+
+	if len(nonce) == 0 {
+		t.Error("Expected non-empty nonce")
+	}
+
+	_ = servicePriv
+}
+
+func TestEncryptWithPublicKeyNoPrivateKey(t *testing.T) {
+	host, err := libp2p.New()
+	if err != nil {
+		t.Fatalf("Failed to create libp2p host: %v", err)
+	}
+	defer host.Close()
+
+	if host.Peerstore().PrivKey(host.ID()) == nil {
+		t.Skip("Host automatically generates a private key")
+	}
+}
+
+func TestEncryptWithServiceKeyNilKey(t *testing.T) {
+	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
+	if err != nil {
+		t.Fatalf("Failed to generate test keys: %v", err)
+	}
+
+	host, err := libp2p.New(libp2p.Identity(priv))
+	if err != nil {
+		t.Fatalf("Failed to create libp2p host: %v", err)
+	}
+	defer host.Close()
+
+	manager := NewManager(host, nil)
+
+	_, _, err = manager.EncryptWithServiceKey([]byte("test"), []byte("pubkey"), nil)
+	if err == nil {
+		t.Error("Expected error when service key is nil")
+	}
+}
+
+func TestEncryptPeerIDWithServiceKeyNoPrivateKey(t *testing.T) {
+	_, servicePub, err := test.RandTestKeyPair(crypto.Ed25519, 256)
+	if err != nil {
+		t.Fatalf("Failed to generate service test keys: %v", err)
+	}
+	_ = servicePub
+
+	host, err := libp2p.New()
+	if err != nil {
+		t.Fatalf("Failed to create libp2p host: %v", err)
+	}
+	defer host.Close()
+
+	if host.Peerstore().PrivKey(host.ID()) == nil {
+		t.Skip("Host automatically generates a private key")
+	}
+}

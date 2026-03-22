@@ -16,7 +16,8 @@ import (
 	"banyan/types"
 )
 
-// PeerHandlers provides peer management HTTP endpoint handlers
+// PeerHandlers provides HTTP endpoint handlers for peer management operations
+// including adding tracked peers and retrieving peer information.
 type PeerHandlers struct {
 	node *nodePkg.Node
 }
@@ -37,7 +38,9 @@ func isLocalhost(r *http.Request) bool {
 	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
-// HandleAddTrackedPeer manually adds a peer to tracking with multiaddress and peer ID
+// HandleAddTrackedPeer handles the /network/peers/add endpoint to manually add
+// a peer to tracking with optional connection attempt and HTTP capability marking.
+// This endpoint is restricted to localhost for security.
 func (ph *PeerHandlers) HandleAddTrackedPeer(w http.ResponseWriter, r *http.Request) {
 	// Restrict to localhost only
 	if !isLocalhost(r) {
@@ -149,7 +152,9 @@ func (ph *PeerHandlers) HandleAddTrackedPeer(w http.ResponseWriter, r *http.Requ
 	log.Printf("Added tracked peer: %s (connect=%v, success=%v)", peerID.String(), request.Connect, response["connected"])
 }
 
-// HandleGetAllPeers returns information about all tracked and untracked peers
+// HandleGetAllPeers handles the /network/peers/all endpoint to return information
+// about all tracked and untracked peers including connection status, service keys,
+// and HTTP capabilities. This endpoint is restricted to localhost for security.
 func (ph *PeerHandlers) HandleGetAllPeers(w http.ResponseWriter, r *http.Request) {
 	// Restrict to localhost only
 	if !isLocalhost(r) {

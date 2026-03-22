@@ -1,3 +1,19 @@
+// Package sdk provides an HTTP multiplexer and routing utilities for building Banyan addons.
+// The Mux type allows addons to register HTTP handlers using standard net/http signatures,
+// with support for middleware chaining and distinction between local (management) and
+// remote (p2p) endpoint kinds.
+//
+// The Mux converts registered routes into SDK Endpoints that can be run via Client.RunMux.
+// This allows addon authors to use familiar http.Handler patterns while the SDK handles
+// the JSON-RPC communication with the host manager.
+//
+// Example usage:
+//
+//	mux := sdk.NewMux()
+//	mux.GET("/my-addon/hello", http.HandlerFunc(handleHello))
+//	mux.POST("/my-addon/data", http.HandlerFunc(handleData))
+//	mux.Use(sdk.Logger(log.Printf))
+//	client.RunMux(mux)
 package sdk
 
 import (
@@ -13,10 +29,13 @@ import (
 	"time"
 )
 
-// Middleware wraps an http.Handler.
+// Middleware is a function that wraps an http.Handler to add cross-cutting concerns
+// such as logging, authentication, or request modification.
 type Middleware func(http.Handler) http.Handler
 
-// Mux is a simple builder for registering endpoints with http-style handlers and middleware.
+// Mux is a builder for registering HTTP endpoints with standard http.Handler signatures.
+// It supports middleware chaining and distinguishes between local (management) and
+// remote (p2p) endpoint kinds. Routes are converted to SDK Endpoints for the Client.
 type Mux struct {
 	logger      func(format string, v ...interface{})
 	middlewares []Middleware
@@ -30,20 +49,20 @@ type muxRoute struct {
 	handler http.Handler
 }
 
-// NewMux creates a new Mux.
+// NewMux creates a new Mux with a default logger that writes to stderr.
 func NewMux() *Mux {
 	return &Mux{logger: func(format string, v ...interface{}) {
 		_, _ = io.WriteString(os.Stderr, fmt.Sprintf(format+"\n", v...))
 	}}
 }
 
-// WithLogger sets a custom logger function.
+// WithLogger sets a custom logging function for request logging.
 func (m *Mux) WithLogger(logf func(format string, v ...interface{})) *Mux {
 	m.logger = logf
 	return m
 }
 
-// Use appends a middleware to the chain.
+// Use appends middleware to the chain. Middleware is applied in registration order.
 func (m *Mux) Use(mw Middleware) *Mux {
 	if mw != nil {
 		m.middlewares = append(m.middlewares, mw)
@@ -51,22 +70,28 @@ func (m *Mux) Use(mw Middleware) *Mux {
 	return m
 }
 
-// Local registers a local (management) endpoint.
+// Local registers a handler on the local (management) endpoint with the given method and path.
 func (m *Mux) Local(method, path string, h http.Handler) *Mux {
 	m.routes = append(m.routes, muxRoute{kind: "local", method: methodOrAny(method), path: path, handler: h})
 	return m
 }
 
-// Remote registers a remote (p2p) endpoint.
+// Remote registers a handler on the remote (p2p) endpoint with the given method and path.
 func (m *Mux) Remote(method, path string, h http.Handler) *Mux {
 	m.routes = append(m.routes, muxRoute{kind: "remote", method: methodOrAny(method), path: path, handler: h})
 	return m
 }
 
-// GET/POST helpers
-func (m *Mux) GET(path string, h http.Handler) *Mux   { return m.Local(http.MethodGet, path, h) }
-func (m *Mux) POST(path string, h http.Handler) *Mux  { return m.Local(http.MethodPost, path, h) }
-func (m *Mux) RGET(path string, h http.Handler) *Mux  { return m.Remote(http.MethodGet, path, h) }
+// GET registers a local GET endpoint. It is a shorthand for Local(http.MethodGet, path, h).
+func (m *Mux) GET(path string, h http.Handler) *Mux { return m.Local(http.MethodGet, path, h) }
+
+// POST registers a local POST endpoint. It is a shorthand for Local(http.MethodPost, path, h).
+func (m *Mux) POST(path string, h http.Handler) *Mux { return m.Local(http.MethodPost, path, h) }
+
+// RGET registers a remote GET endpoint. It is a shorthand for Remote(http.MethodGet, path, h).
+func (m *Mux) RGET(path string, h http.Handler) *Mux { return m.Remote(http.MethodGet, path, h) }
+
+// RPOST registers a remote POST endpoint. It is a shorthand for Remote(http.MethodPost, path, h).
 func (m *Mux) RPOST(path string, h http.Handler) *Mux { return m.Remote(http.MethodPost, path, h) }
 
 func methodOrAny(m string) string {
@@ -76,7 +101,7 @@ func methodOrAny(m string) string {
 	return m
 }
 
-// endpoints converts mux routes to SDK endpoints.
+// endpoints converts Mux routes to SDK Endpoints for use with Client.Run.
 func (m *Mux) endpoints() []Endpoint {
 	endpoints := make([]Endpoint, 0, len(m.routes))
 	for _, r := range m.routes {
@@ -109,7 +134,7 @@ func (m *Mux) endpoints() []Endpoint {
 	return endpoints
 }
 
-// Logger is a middleware that logs request and response.
+// Logger returns middleware that logs each request with method, path, status, size, and duration.
 func Logger(logf func(format string, v ...interface{})) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -133,6 +158,8 @@ func Logger(logf func(format string, v ...interface{})) Middleware {
 
 // Helpers for common operations in handlers
 
+// WriteJSON writes a JSON-encoded response with the given status code and content type header.
+// If status is 0, http.StatusOK (200) is used.
 func WriteJSON(w http.ResponseWriter, status int, v any) {
 	b, _ := json.Marshal(v)
 	if status == 0 {
@@ -143,6 +170,8 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 	_, _ = w.Write(b)
 }
 
+// WriteText writes a text/plain response with the given status code.
+// If status is 0, http.StatusOK (200) is used.
 func WriteText(w http.ResponseWriter, status int, body string) {
 	if status == 0 {
 		status = http.StatusOK
@@ -152,13 +181,14 @@ func WriteText(w http.ResponseWriter, status int, body string) {
 	_, _ = io.WriteString(w, body)
 }
 
+// BindJSON decodes a JSON request body into the provided value and closes the body.
 func BindJSON(r *http.Request, v any) error {
 	defer r.Body.Close()
 	dec := json.NewDecoder(r.Body)
 	return dec.Decode(v)
 }
 
-// responseBuffer captures http responses in-memory
+// responseBuffer captures http.ResponseWriter output in memory for conversion to HTTPResponse.
 type responseBuffer struct {
 	headers http.Header
 	status  int
@@ -189,7 +219,8 @@ func withPathParams(r *http.Request, pp map[string]string) *http.Request {
 	return r.WithContext(ctx)
 }
 
-// Param gets a path parameter by name, returns empty string if missing.
+// Param retrieves a path parameter value by name from the request context.
+// Returns an empty string if the parameter is not found.
 func Param(r *http.Request, name string) string {
 	pp, _ := r.Context().Value(pathParamsKey).(map[string]string)
 	if pp == nil {

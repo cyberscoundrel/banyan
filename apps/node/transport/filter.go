@@ -1,3 +1,25 @@
+// Package transport provides utilities for filtering and managing multiaddress
+// transport protocols in peer-to-peer networking contexts.
+//
+// This package enables applications to restrict peer connections to specific
+// transport types such as TCP, QUIC, WebSocket, I2P, Nym mixnet, or Tor.
+// It parses libp2p multiaddresses to extract transport identifiers and provides
+// filtering functions to select addresses based on allowed transport types.
+//
+// Supported transports include:
+//   - tcp: Standard TCP connections
+//   - udp: UDP datagrams
+//   - quic: QUIC protocol (HTTP/3)
+//   - ws: Unencrypted WebSocket
+//   - wss: Secure WebSocket (TLS)
+//   - i2p: I2P anonymous network
+//   - nym: Nym mixnet
+//   - onion: Tor hidden services
+//
+// Example usage:
+//
+//	allowed := []string{"quic", "wss"}
+//	filtered := FilterMultiaddrsByTransport(peerAddrs, allowed)
 package transport
 
 import (

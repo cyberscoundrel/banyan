@@ -1,0 +1,12 @@
+{
+  "serviceAlias": "signed-service",
+  "root": {
+    "path": "/",
+    "keys": ["signed-key-1", "signed-key-2"]
+  },
+  "nonce": "0123456789abcdef",
+  "requesterPeerId": "QmTestRequester123456789",
+  "signatures": ["signature1hex", "signature2hex"],
+  "requiredSigners": ["authority1hex", "authority2hex"],
+  "authoritySignatures": ["authoritySig1hex"]
+}

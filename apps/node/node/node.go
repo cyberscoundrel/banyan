@@ -1,3 +1,14 @@
+// Package node provides the core Banyan network node implementation.
+// It wraps a libp2p host with additional capabilities including:
+//   - Distributed Hash Table (DHT) for peer discovery
+//   - GossipSub for pubsub messaging
+//   - HTTP proxy capabilities over libp2p
+//   - Service beacon functionality
+//   - TCP tunnel support
+//   - Event broadcasting
+//
+// The Node struct is the main entry point for creating and managing a Banyan node.
+// Use NewNode to create a new node instance with the desired configuration.
 package node
 
 import (
@@ -35,41 +46,63 @@ import (
 	"banyan/types"
 )
 
-// HTTPServer interface for the management API server - keeping here for backwards compatibility
-// but recommend using interfaces.HTTPServer for new code
+// HTTPServer defines the interface for the management API server.
+// It provides event broadcasting and graceful shutdown capabilities.
+// This interface is kept for backwards compatibility; new code should
+// use interfaces.HTTPServer instead.
 type HTTPServer interface {
+	// BroadcastEvent sends an event to all connected clients.
 	BroadcastEvent(event types.Event)
+	// Close shuts down the server and releases resources.
 	Close() error
 }
 
-// Configuration holds node configuration
+// Config holds all configuration options for a Node.
+// All fields are pointers to allow distinguishing between "not set" and "set to zero value".
 type Config struct {
-	PrivKeyFile     *string
-	ServicesDir     *string
-	FigsDir         *string
-	DisableDHT      *bool
-	NoAnnounce      *bool
+	// PrivKeyFile is the path to a PEM file containing the node's private key.
+	PrivKeyFile *string
+	// ServicesDir is the directory containing services.json and per-service subfolders.
+	ServicesDir *string
+	// FigsDir is the directory containing fig files.
+	FigsDir *string
+	// DisableDHT disables DHT peer discovery and lookup when true.
+	DisableDHT *bool
+	// NoAnnounce prevents the node from announcing via DHT or pubsub when true.
+	NoAnnounce *bool
+	// ListenMultiaddr is the multiaddr the node listens on (e.g., "/ip4/0.0.0.0/tcp/0").
 	ListenMultiaddr *string
-	NATTraversal    *bool
-	NoCrypto        *bool
-	AnonLookups     *bool
-	RouterConfig    *string
-	Bootstraps      []string // Optional bootstrap peer multiaddrs
-	// Fig validation flags
-	AllowExpiredFigs  *bool
+	// NATTraversal enables NAT traversal features including hole punching and auto-relay.
+	NATTraversal *bool
+	// NoCrypto disables encryption on pubsub messages when true.
+	NoCrypto *bool
+	// AnonLookups allows anonymous lookups and responses when true.
+	AnonLookups *bool
+	// RouterConfig is the path to a JSON file containing URL routing configuration.
+	RouterConfig *string
+	// Bootstraps is a list of bootstrap peer multiaddrs for DHT initialization.
+	Bootstraps []string
+	// AllowExpiredFigs allows loading expired fig files when true (security risk).
+	AllowExpiredFigs *bool
+	// AllowInsecureFigs allows loading fig files with invalid signatures when true (security risk).
 	AllowInsecureFigs *bool
-	// Beacon behavior flags
+	// BeaconIncludePeerIDAnnouncements includes the beacon's PeerID in public announcements.
 	BeaconIncludePeerIDAnnouncements *bool
-	BeaconPeerIDDirectOnly           *bool
-	// Transport restriction flags
-	OverrideTransportRestrictions *bool // Allow connections even if transport doesn't match fig restrictions
-	// Tunnel configuration
-	TunnelEnabled        *bool    // Enable TCP tunnel protocol handler
-	TunnelAuthToken      *string  // Auth token required for tunnel API (optional)
-	TunnelAllowedTargets []string // Allowed target hosts for outbound tunnels (default: localhost only)
+	// BeaconPeerIDDirectOnly only includes the beacon's PeerID in direct replies to locators.
+	BeaconPeerIDDirectOnly *bool
+	// OverrideTransportRestrictions allows connections even if transport doesn't match fig restrictions.
+	OverrideTransportRestrictions *bool
+	// TunnelEnabled enables the TCP tunnel protocol handler.
+	TunnelEnabled *bool
+	// TunnelAuthToken is the auth token required for tunnel API endpoints.
+	TunnelAuthToken *string
+	// TunnelAllowedTargets is the list of allowed target hosts for outbound tunnels.
+	TunnelAllowedTargets []string
 }
 
-// Node represents our libp2p node with HTTP proxy capabilities
+// Node represents a Banyan libp2p node with HTTP proxy capabilities.
+// It encapsulates all components needed for peer-to-peer communication,
+// service discovery, and HTTP request handling.
 type Node struct {
 	// Core libp2p components
 	host          host.Host
@@ -111,10 +144,19 @@ type Node struct {
 	keyLoader PrivateKeyLoader
 }
 
-// LoadPrivateKeyFromPEM loads a private key from a PEM file
+// PrivateKeyLoader is a function type for loading private keys from PEM files.
+// It takes a filename and returns a libp2p private key or an error.
 type PrivateKeyLoader func(filename string) (crypto.PrivKey, error)
 
-// NewNode creates a new libp2p node with all managers
+// NewNode creates a new Banyan node with the specified configuration.
+// It initializes all libp2p components including the host, DHT, pubsub,
+// and various managers for connections, discovery, services, and HTTP handling.
+//
+// The keyLoader parameter is used to load private keys for the node identity
+// and for service beacons. If config.PrivKeyFile is set, it will be used
+// to load the node's identity key.
+//
+// Returns an error if the libp2p host, DHT, or pubsub initialization fails.
 func NewNode(ctx context.Context, config *Config, keyLoader PrivateKeyLoader) (*Node, error) {
 	var opts []libp2p.Option
 
@@ -420,7 +462,10 @@ func NewNode(ctx context.Context, config *Config, keyLoader PrivateKeyLoader) (*
 	return node, nil
 }
 
-// Start initializes and starts all node services
+// Start initializes and starts all node services including peer discovery,
+// gossip message handling, the libp2p protocol server, and service beacons.
+// It should be called after NewNode to begin normal node operation.
+// Returns an error if service loading or beacon startup fails.
 func (n *Node) Start() error {
 	// Start discovery mechanisms
 	n.discoveryManager.StartPeerDiscovery(n.connectionManager)
@@ -445,7 +490,8 @@ func (n *Node) Start() error {
 	return nil
 }
 
-// Close shuts down the node
+// Close shuts down the node by closing the HTTP server, listener, and libp2p host.
+// It releases all resources held by the node.
 func (n *Node) Close() {
 	if n.httpServer != nil {
 		n.httpServer.Close()
@@ -456,7 +502,9 @@ func (n *Node) Close() {
 	n.host.Close()
 }
 
-// SendEvent sends an event to all subscribers via the event broadcaster
+// SendEvent broadcasts an event to all subscribers via the event broadcaster.
+// It also sends the event via the HTTP server if one is configured,
+// for backwards compatibility with HTTP-based event clients.
 func (n *Node) SendEvent(eventType string, data interface{}) {
 	if n.eventBroadcaster != nil {
 		n.eventBroadcaster.SendEvent(eventType, data)
@@ -475,21 +523,25 @@ func (n *Node) SendEvent(eventType string, data interface{}) {
 }
 
 // GetNATReachability returns the current NAT reachability status as a string.
+// Possible values include "Unknown", "Public", and "Private".
 func (n *Node) GetNATReachability() string {
 	return network.Reachability(n.natReachability.Load()).String()
 }
 
-// HasRelayAddr returns true if the node has at least one relay address.
+// HasRelayAddr returns true if the node has at least one relay (/p2p-circuit) address,
+// indicating that the node can be reached via circuit relay.
 func (n *Node) HasRelayAddr() bool {
 	return n.hasRelayAddr.Load()
 }
 
 // GetRelayAddrs returns the list of relay (/p2p-circuit) addresses as strings.
+// Returns an empty slice if no relay addresses are available.
 func (n *Node) GetRelayAddrs() []string {
 	return getRelayAddrs(n.host.Addrs())
 }
 
-// IsDHTReady returns true if the DHT routing table has at least one peer.
+// IsDHTReady returns true if the DHT routing table has at least one peer,
+// indicating that the DHT is operational for peer lookups.
 func (n *Node) IsDHTReady() bool {
 	return n.dhtReady.Load()
 }
@@ -507,6 +559,8 @@ func (n *Node) IsNATTraversalEnabled() bool {
 	return n.config.NATTraversal != nil && *n.config.NATTraversal
 }
 
+// checkForRelayAddrs returns true if any of the provided multiaddrs contain
+// the /p2p-circuit component, indicating relay capability.
 func checkForRelayAddrs(addrs []multiaddr.Multiaddr) bool {
 	for _, addr := range addrs {
 		if strings.Contains(addr.String(), "/p2p-circuit") {
@@ -516,6 +570,8 @@ func checkForRelayAddrs(addrs []multiaddr.Multiaddr) bool {
 	return false
 }
 
+// getRelayAddrs extracts and returns all relay addresses from the provided
+// multiaddr list as strings.
 func getRelayAddrs(addrs []multiaddr.Multiaddr) []string {
 	var result []string
 	for _, addr := range addrs {
@@ -526,7 +582,9 @@ func getRelayAddrs(addrs []multiaddr.Multiaddr) []string {
 	return result
 }
 
-// handleGossipMessages handles incoming gossip messages
+// handleGossipMessages processes incoming gossip messages from the pubsub subscription.
+// It filters out messages from itself and forwards remaining messages to the
+// discovery manager for processing.
 func (n *Node) handleGossipMessages() {
 	for {
 		msg, err := n.gossipSub.Next(n.ctx)
@@ -548,7 +606,8 @@ func (n *Node) handleGossipMessages() {
 	}
 }
 
-// logConnectionDetails logs connection details for NAT traversal debugging
+// logConnectionDetails emits a connection_details event with information about
+// a new peer connection, useful for NAT traversal debugging.
 func (n *Node) logConnectionDetails(conn network.Conn) {
 	n.SendEvent("connection_details", map[string]interface{}{
 		"remote_peer":   conn.RemotePeer().String(),
@@ -559,67 +618,70 @@ func (n *Node) logConnectionDetails(conn network.Conn) {
 	})
 }
 
-// GetHost returns the libp2p host
+// GetHost returns the underlying libp2p host.
 func (n *Node) GetHost() host.Host {
 	return n.host
 }
 
-// GetConnectionManager returns the connection manager
+// GetConnectionManager returns the connection manager for this node.
 func (n *Node) GetConnectionManager() interfaces.PeerManager {
 	return n.connectionManager
 }
 
-// GetServiceManager returns the service manager
+// GetServiceManager returns the service manager for this node.
 func (n *Node) GetServiceManager() interfaces.ServiceManager {
 	return n.serviceManager
 }
 
-// GetHTTPHandler returns the HTTP handler
+// GetHTTPHandler returns the HTTP handler for this node.
 func (n *Node) GetHTTPHandler() interfaces.HTTPHandler {
 	return n.httpHandler
 }
 
-// GetDiscoveryManager returns the discovery manager
+// GetDiscoveryManager returns the discovery manager for this node.
 func (n *Node) GetDiscoveryManager() interfaces.DiscoveryManager {
 	return n.discoveryManager
 }
 
-// GetHTTPTransport returns the HTTP transport
+// GetHTTPTransport returns the HTTP transport configured for libp2p URLs.
 func (n *Node) GetHTTPTransport() *http.Transport {
 	return n.httpTransport
 }
 
-// SetHTTPServer sets the HTTP server for event broadcasting
+// SetHTTPServer sets the HTTP server for event broadcasting.
 func (n *Node) SetHTTPServer(server HTTPServer) {
 	n.httpServer = server
 }
 
-// SetEventBroadcaster sets the event broadcaster for the node
+// SetEventBroadcaster sets the event broadcaster for the node.
 func (n *Node) SetEventBroadcaster(broadcaster interfaces.EventBroadcaster) {
 	n.eventBroadcaster = broadcaster
 }
 
-// GetEventBroadcaster returns the event broadcaster
+// GetEventBroadcaster returns the event broadcaster for this node.
 func (n *Node) GetEventBroadcaster() interfaces.EventBroadcaster {
 	return n.eventBroadcaster
 }
 
-// GetRouteTable returns the route table
+// GetRouteTable returns the URL route table for this node.
 func (n *Node) GetRouteTable() *types.RouteTable {
 	return n.routeTable
 }
 
-// GetConfig returns the node configuration
+// GetConfig returns the node configuration.
 func (n *Node) GetConfig() *Config {
 	return n.config
 }
 
-// GetTunnelHandler returns the TCP tunnel handler
+// GetTunnelHandler returns the TCP tunnel handler for this node,
+// or nil if tunneling is not enabled.
 func (n *Node) GetTunnelHandler() *tunnelPkg.Handler {
 	return n.tunnelHandler
 }
 
-// loadAndStartServices loads services.json from the services directory and starts service beacons
+// loadAndStartServices loads services.json from the services directory and starts
+// service beacons for each configured service. It loads service keys, registers
+// routes, and creates beacons for service discovery.
 func (n *Node) loadAndStartServices() error {
 	// Determine services dir
 	var servicesDir string
@@ -793,7 +855,8 @@ func (n *Node) loadAndStartServices() error {
 	return nil
 }
 
-// loadRouteConfig loads route configuration from a JSON file
+// loadRouteConfig loads route configuration from a JSON file and populates
+// the provided route table with identifier to URL mappings.
 func loadRouteConfig(filename string, routeTable *types.RouteTable) error {
 	data, err := os.ReadFile(filename)
 	if err != nil {

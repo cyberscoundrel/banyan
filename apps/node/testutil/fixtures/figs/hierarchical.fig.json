@@ -1,0 +1,27 @@
+{
+  "serviceAlias": "hierarchical-service",
+  "root": {
+    "path": "/",
+    "keys": ["root-key"],
+    "children": [
+      {
+        "path": "/api",
+        "keys": ["api-key"],
+        "children": [
+          {
+            "path": "/api/v1",
+            "keys": ["api-v1-key"]
+          },
+          {
+            "path": "/api/v2",
+            "keys": ["api-v2-key"]
+          }
+        ]
+      },
+      {
+        "path": "/admin",
+        "keys": ["admin-key"]
+      }
+    ]
+  }
+}
