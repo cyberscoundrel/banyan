@@ -26,42 +26,42 @@ The Banyan node is a libp2p-based peer-to-peer networking application that provi
 
 ### Architecture Diagram
 
-```mermaid
+```
 flowchart TD
-    subgraph ENTRY["🚀 Entry Point"]
-        MAIN["main.go<br/>Loads config<br/>Creates node<br/>Starts services"]
+    subgraph ENTRY["Entry Point"]
+        MAIN["main.go<br/>CLI parsing, config loading"]
     end
 
-    subgraph NODE["🔧 Node Core - node/node.go"]
+    subgraph NODE["Node Core - node/node.go"]
         direction TB
-        HOST["libp2p Host<br/>P2P Networking"]
-        DHT["DHT<br/>Distributed Hash Table"]
-        PUBSUB["PubSub<br/>Publish/Subscribe"]
+        HOST["libp2p Host"]
+        DHT["DHT"]
+        PUBSUB["PubSub"]
     end
 
-    subgraph MANAGERS["📦 Managers Layer"]
+    subgraph MANAGERS["Managers"]
         direction LR
-        CONN["Connection Manager<br/><small>Tracks peers, status,<br/>HTTP capability, aliases</small>"]
-        DISC["Discovery Manager<br/><small>DHT, mDNS, GossipSub</small>"]
-        SERV["Service Manager<br/><small>Beacons, Locators,<br/>Fig templates</small>"]
-        CRYP["Crypto Manager<br/><small>AES-GCM encryption,<br/>service keys</small>"]
+        CONN["Connection<br/>Peer tracking"]
+        DISC["Discovery<br/>DHT, mDNS"]
+        SERV["Service<br/>Beacons, Locators"]
+        CRYP["Crypto<br/>Encryption"]
     end
 
-    subgraph PROTOCOL["📡 Protocol Handlers - libp2p-http/"]
+    subgraph PROTOCOL["Libp2p Protocol Handlers"]
         direction LR
-        PING["/ping<br/>Health check"]
-        GREET["/greetings<br/>Peer identification"]
-        FIGS["/serviceFigs<br/>Template exchange"]
+        PING["/ping"]
+        GREET["/greetings"]
+        FIGS["/serviceFigs"]
     end
 
-    subgraph SERVERS["🖥️ Server Layer"]
+    subgraph SERVERS["HTTP Servers"]
         direction TB
-        MGMT["Management Server<br/><small>/status, /peers, /tunnel,<br/>/service/beacons</small>"]
-        WS["WebSocket Hub<br/><small>Real-time events</small>"]
+        MGMT["Management API<br/>localhost:9999"]
+        WS["WebSocket Hub<br/>Real-time events"]
     end
 
-    subgraph ADDONS["🧩 Addon System"]
-        ADDON["Addon Manager<br/><small>JSON-RPC over stdin/stdout</small>"]
+    subgraph ADDONS["Addon System"]
+        ADDON["JSON-RPC Addons"]
     end
 
     MAIN --> NODE
@@ -69,40 +69,15 @@ flowchart TD
     MANAGERS --> PROTOCOL
     MANAGERS --> SERVERS
     NODE --> ADDONS
-
-    style ENTRY fill:#e1f5fe,stroke:#01579b
-    style NODE fill:#fff3e0,stroke:#e65100
-    style MANAGERS fill:#e8f5e9,stroke:#1b5e20
-    style PROTOCOL fill:#fce4ec,stroke:#880e4f
-    style SERVERS fill:#f3e5f5,stroke:#4a148c
-    style ADDONS fill:#fff8e1,stroke:#f57f17
 ```
 
-### Data Flow Diagram
+### Data Flow Summary
+```
+Client Request Flow:
+  Client --> Management Server HTTP --> Node --> Manager --> Libp2p Protocol Handler --> Response
 
-```mermaid
-flowchart LR
-    subgraph REQUEST["Request Flow"]
-        direction TB
-        C1["Client"] -->|"HTTP Request"| MS["Management Server"]
-        MS -->|"Method Call"| N["Node"]
-        N -->|"Delegate"| M["Manager"]
-        M -->|"P2P Call"| PH["Protocol Handler"]
-        PH -->|"Response"| M
-        M -->|"Result"| N
-        N -->|"Response"| MS
-        MS -->|"JSON Response"| C1
-    end
-
-    subgraph EVENTS["Event Flow"]
-        direction TB
-        M2["Managers"] -->|"Broadcast Event"| EB["Event Broadcaster"]
-        EB -->|"Distribute"| WS["WebSocket Hub"]
-        WS -->|"Push"| C2["WebSocket Clients"]
-    end
-
-    style REQUEST fill:#e3f2fd,stroke:#1565c0
-    style EVENTS fill:#fce4ec,stroke:#ad1457
+Event Broadcast Flow:
+  Managers --> Event Broadcaster --> WebSocket Hub --> Connected Clients
 ```
 
 ### Key Design Principles
