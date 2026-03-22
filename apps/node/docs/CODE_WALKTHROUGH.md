@@ -26,69 +26,83 @@ The Banyan node is a libp2p-based peer-to-peer networking application that provi
 
 ### Architecture Diagram
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              ENTRY POINT                                 │
-│                                                                         │
-│   main.go ───────────────────────────────────────────── Loads config    │
-│     │                                                    Creates node    │
-│     ▼                                                    Starts services │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                            NODE LAYER                                    │
-│                                                                         │
-│   node/node.go ───────────────────────────────────── Orchestrates all   │
-│     │                                                 components         │
-│     ├── libp2p Host (P2P networking)                                    │
-│     ├── DHT (Distributed Hash Table)                                    │
-│     └── PubSub (Publish/Subscribe messaging)                            │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-          ┌─────────────────────────┼─────────────────────────┐
-          ▼                         ▼                         ▼
-┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
-│   CONNECTION     │    │    DISCOVERY     │    │     SERVICE      │
-│                  │    │                  │    │                  │
-│ Tracks peers     │    │ Finds peers via: │    │ Manages:         │
-│ - Status         │    │ - DHT            │    │ - Beacons        │
-│ - HTTP capable   │    │ - mDNS           │    │ - Locators       │
-│ - Aliases        │    │ - GossipSub      │    │ - Fig templates  │
-└──────────────────┘    └──────────────────┘    └──────────────────┘
-          │                         │                         │
-          └─────────────────────────┼─────────────────────────┘
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          PROTOCOL HANDLERS                               │
-│                                                                         │
-│   libp2p-http/handler.go ─────────────────────────── P2P HTTP endpoints │
-│     ├── /ping        Health check                                       │
-│     ├── /greetings   Peer identification                                │
-│     └── /serviceFigs Fig template exchange                              │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          SERVER LAYER                                    │
-│                                                                         │
-│   management-server/ ─────────────────────────────── HTTP API server    │
-│     ├── /status           Node status                                   │
-│     ├── /peers            Peer list                                     │
-│     ├── /service/beacons  Service beacons                               │
-│     └── /tunnel           TCP tunnel management                         │
-│                                                                         │
-│   websocket/hub.go ───────────────────────────────── Event broadcasting │
-│     └── Real-time events to connected clients                           │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph ENTRY["🚀 Entry Point"]
+        MAIN["main.go<br/>Loads config<br/>Creates node<br/>Starts services"]
+    end
+
+    subgraph NODE["🔧 Node Core - node/node.go"]
+        direction TB
+        HOST["libp2p Host<br/>P2P Networking"]
+        DHT["DHT<br/>Distributed Hash Table"]
+        PUBSUB["PubSub<br/>Publish/Subscribe"]
+    end
+
+    subgraph MANAGERS["📦 Managers Layer"]
+        direction LR
+        CONN["Connection Manager<br/><small>Tracks peers, status,<br/>HTTP capability, aliases</small>"]
+        DISC["Discovery Manager<br/><small>DHT, mDNS, GossipSub</small>"]
+        SERV["Service Manager<br/><small>Beacons, Locators,<br/>Fig templates</small>"]
+        CRYP["Crypto Manager<br/><small>AES-GCM encryption,<br/>service keys</small>"]
+    end
+
+    subgraph PROTOCOL["📡 Protocol Handlers - libp2p-http/"]
+        direction LR
+        PING["/ping<br/>Health check"]
+        GREET["/greetings<br/>Peer identification"]
+        FIGS["/serviceFigs<br/>Template exchange"]
+    end
+
+    subgraph SERVERS["🖥️ Server Layer"]
+        direction TB
+        MGMT["Management Server<br/><small>/status, /peers, /tunnel,<br/>/service/beacons</small>"]
+        WS["WebSocket Hub<br/><small>Real-time events</small>"]
+    end
+
+    subgraph ADDONS["🧩 Addon System"]
+        ADDON["Addon Manager<br/><small>JSON-RPC over stdin/stdout</small>"]
+    end
+
+    MAIN --> NODE
+    NODE --> MANAGERS
+    MANAGERS --> PROTOCOL
+    MANAGERS --> SERVERS
+    NODE --> ADDONS
+
+    style ENTRY fill:#e1f5fe,stroke:#01579b
+    style NODE fill:#fff3e0,stroke:#e65100
+    style MANAGERS fill:#e8f5e9,stroke:#1b5e20
+    style PROTOCOL fill:#fce4ec,stroke:#880e4f
+    style SERVERS fill:#f3e5f5,stroke:#4a148c
+    style ADDONS fill:#fff8e1,stroke:#f57f17
 ```
 
-### Data Flow Summary
+### Data Flow Diagram
 
-```
-User Request ──▶ main.go ──▶ node.go ──▶ Manager ──▶ Protocol Handler
-                                                        │
-                    ◀── Response ◀── Result ◀──────────┘
+```mermaid
+flowchart LR
+    subgraph REQUEST["Request Flow"]
+        direction TB
+        C1["Client"] -->|"HTTP Request"| MS["Management Server"]
+        MS -->|"Method Call"| N["Node"]
+        N -->|"Delegate"| M["Manager"]
+        M -->|"P2P Call"| PH["Protocol Handler"]
+        PH -->|"Response"| M
+        M -->|"Result"| N
+        N -->|"Response"| MS
+        MS -->|"JSON Response"| C1
+    end
+
+    subgraph EVENTS["Event Flow"]
+        direction TB
+        M2["Managers"] -->|"Broadcast Event"| EB["Event Broadcaster"]
+        EB -->|"Distribute"| WS["WebSocket Hub"]
+        WS -->|"Push"| C2["WebSocket Clients"]
+    end
+
+    style REQUEST fill:#e3f2fd,stroke:#1565c0
+    style EVENTS fill:#fce4ec,stroke:#ad1457
 ```
 
 ### Key Design Principles
