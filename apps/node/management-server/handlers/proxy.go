@@ -17,7 +17,8 @@ import (
 	"banyan/types"
 )
 
-// ProxyHandlers provides proxy-related HTTP endpoint handlers
+// ProxyHandlers provides HTTP endpoint handlers for proxying requests through
+// libp2p to other peers using peer ID, service key, or service alias.
 type ProxyHandlers struct {
 	node           *nodePkg.Node
 	broadcastEvent func(types.Event)
@@ -31,7 +32,9 @@ func NewProxyHandlers(node *nodePkg.Node, broadcastEvent func(types.Event)) *Pro
 	}
 }
 
-// HandleLibp2pProxy proxies requests through libp2p HTTP to other peers
+// HandleLibp2pProxy handles the /proxy/peer/{peerID}/{path} endpoint to proxy
+// HTTP requests through libp2p to a specific peer. It validates peer connectivity
+// and HTTP capability before forwarding the request.
 func (ph *ProxyHandlers) HandleLibp2pProxy(w http.ResponseWriter, r *http.Request) {
 	if ph.node == nil {
 		http.Error(w, "LibP2P node not available", http.StatusServiceUnavailable)
@@ -162,6 +165,9 @@ func (ph *ProxyHandlers) HandleLibp2pProxy(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+// HandleServiceKeyProxy handles the /proxy/service/{key}/{path} endpoint to proxy
+// requests to a peer identified by service key. It requires a POST request with
+// a JSON body containing the compressed_public_key field.
 func (ph *ProxyHandlers) HandleServiceKeyProxy(w http.ResponseWriter, r *http.Request) {
 	if ph.node == nil {
 		http.Error(w, "LibP2P node not available", http.StatusServiceUnavailable)
@@ -216,12 +222,9 @@ func (ph *ProxyHandlers) HandleServiceKeyProxy(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Construct new URL for peer proxy
-	// Use /router/ endpoint if the peer has a route registered, otherwise use direct path
-	newPath := fmt.Sprintf("/proxy/peer/%s/%s", selectedPeer.String(), remainingPath)
-
 	// Update request URL and forward to peer proxy handler
-	originalPath := r.URL.Path
+	var originalPath string
+	newPath := fmt.Sprintf("/proxy/peer/%s/%s", selectedPeer.String(), remainingPath)
 	if remainingPath != "" {
 		originalPath = fmt.Sprintf("/proxy/service/%s/%s", requestBody.CompressedPublicKey, remainingPath)
 	} else {
@@ -229,14 +232,15 @@ func (ph *ProxyHandlers) HandleServiceKeyProxy(w http.ResponseWriter, r *http.Re
 	}
 	r.URL.Path = newPath
 
-	// Log the redirect for debugging
 	log.Printf("Service key proxy: %s -> %s (service key: %s, peer: %s)", originalPath, newPath, requestBody.CompressedPublicKey, selectedPeer.String())
 
 	// Forward to the peer proxy handler
 	ph.HandleLibp2pProxy(w, r)
 }
 
-// HandleAliasProxy redirects alias-based requests to the libp2p proxy
+// HandleAliasProxy handles the /proxy/alias/{alias}/{path} endpoint to proxy
+// requests to a peer identified by service alias. It supports hierarchical path
+// matching when fig data is available for the alias.
 func (ph *ProxyHandlers) HandleAliasProxy(w http.ResponseWriter, r *http.Request) {
 	if ph.node == nil {
 		http.Error(w, "LibP2P node not available", http.StatusServiceUnavailable)

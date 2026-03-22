@@ -26,7 +26,8 @@ import (
 	"banyan/types"
 )
 
-// ServiceHandlers provides service-related HTTP endpoint handlers
+// ServiceHandlers provides HTTP endpoint handlers for service management operations
+// including service discovery (find), beacons, locators, and fig file handling.
 type ServiceHandlers struct {
 	node           *nodePkg.Node
 	broadcastEvent func(types.Event)
@@ -226,7 +227,8 @@ func GetFigDataForAlias(alias string, addonName string) (types.FigFile, bool) {
 	return fig, ok
 }
 
-// FindRequest represents the request body for the find endpoint
+// FindRequest represents the request body for the /services/find endpoint.
+// At least one of CompressedPublicKey, FigLocation, or Alias must be provided.
 type FindRequest struct {
 	CompressedPublicKey string `json:"compressedPublicKey"`
 	FigLocation         string `json:"figLocation"`
@@ -234,18 +236,19 @@ type FindRequest struct {
 	Addon               string `json:"addon"`
 }
 
-// ServeRequest represents the request body for the serve endpoint
+// ServeRequest represents the request body for the /services/start endpoint.
+// It specifies the file location of the PEM-encoded private key for the service.
 type ServeRequest struct {
 	FileLocation string `json:"fileLocation"`
 }
 
-// LocatorStartRequest represents a request to start a locator from a service key
+// LocatorStartRequest represents a request to start a service locator from a public key.
 type LocatorStartRequest struct {
 	// hex-encoded bytes of libp2p public key (compressed or marshaled per crypto.MarshalPublicKey)
 	CompressedPublicKey string `json:"compressedPublicKey"`
 }
 
-// LocatorInfo represents information about a service locator
+// LocatorInfo represents information about an active service locator.
 type LocatorInfo struct {
 	ServiceKeyHash string                  `json:"serviceKeyHash"`
 	ServiceKey     string                  `json:"serviceKey"`
@@ -256,7 +259,7 @@ type LocatorInfo struct {
 	CreatedAt      time.Time               `json:"createdAt"`
 }
 
-// BeaconInfo represents information about a service beacon
+// BeaconInfo represents information about an active service beacon.
 type BeaconInfo struct {
 	ServiceKeyHash string                  `json:"serviceKeyHash"`
 	ServiceKey     string                  `json:"serviceKey"`
@@ -267,7 +270,9 @@ type BeaconInfo struct {
 	CreatedAt      time.Time               `json:"createdAt"`
 }
 
-// HandleFind implements the /find endpoint
+// HandleFind implements the /services/find endpoint for service discovery.
+// It supports finding services by compressed public key, fig file location, or alias.
+// When an alias is provided, it attempts resolution via addons with local fallback.
 func (sh *ServiceHandlers) HandleFind(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -467,7 +472,8 @@ func (sh *ServiceHandlers) HandleFind(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Started service locator for service key: %s", serviceKeyHash)
 }
 
-// HandleLocatorStart starts a service locator given a compressed public key.
+// HandleLocatorStart handles the /services/locator/start endpoint to start
+// a service locator for discovering peers that announce a specific service key.
 func (sh *ServiceHandlers) HandleLocatorStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -504,7 +510,8 @@ func (sh *ServiceHandlers) HandleLocatorStart(w http.ResponseWriter, r *http.Req
 	_ = json.NewEncoder(w).Encode(res)
 }
 
-// HandleLocators implements the /locators endpoint
+// HandleLocators implements the /services/locators endpoint to list all
+// active service locators and their discovered peers.
 func (sh *ServiceHandlers) HandleLocators(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -560,7 +567,8 @@ func (sh *ServiceHandlers) HandleLocators(w http.ResponseWriter, r *http.Request
 	log.Printf("Served locators list: %s %s", r.Method, r.URL.Path)
 }
 
-// HandleLocatorSuspend implements the locator suspend endpoint
+// HandleLocatorSuspend implements the /services/locator/suspend/{hash} endpoint
+// to temporarily suspend a service locator from actively discovering peers.
 func (sh *ServiceHandlers) HandleLocatorSuspend(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -589,7 +597,8 @@ func (sh *ServiceHandlers) HandleLocatorSuspend(w http.ResponseWriter, r *http.R
 	log.Printf("Suspended locator: %s", serviceKeyHash)
 }
 
-// HandleLocatorRevive implements the locator revive endpoint
+// HandleLocatorRevive implements the /services/locator/revive/{hash} endpoint
+// to resume a previously suspended service locator.
 func (sh *ServiceHandlers) HandleLocatorRevive(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -616,7 +625,8 @@ func (sh *ServiceHandlers) HandleLocatorRevive(w http.ResponseWriter, r *http.Re
 	log.Printf("Revived locator: %s", serviceKeyHash)
 }
 
-// HandleLocatorDestroy implements the locator destroy endpoint
+// HandleLocatorDestroy implements the /services/locator/destroy/{hash} endpoint
+// to permanently stop and remove a service locator.
 func (sh *ServiceHandlers) HandleLocatorDestroy(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -643,7 +653,8 @@ func (sh *ServiceHandlers) HandleLocatorDestroy(w http.ResponseWriter, r *http.R
 	log.Printf("Destroyed locator: %s", serviceKeyHash)
 }
 
-// HandleServe implements the /serve endpoint
+// HandleServe implements the /services/start endpoint to create and start
+// a service beacon from a PEM-encoded private key file.
 func (sh *ServiceHandlers) HandleServe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -737,10 +748,11 @@ func (sh *ServiceHandlers) HandleServe(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Started service beacon for service key: %s from file: %s", serviceKeyHash, req.FileLocation)
 }
 
-// HandleBeaconSuspend implements the beacon suspend endpoint
+// HandleBeaconSuspend implements the beacon suspend endpoint to temporarily
+// suspend service announcements while keeping the beacon active for replies.
 // Supports both legacy (no hash) and new (with hash) URL patterns:
-// - /services/beacon/suspend (legacy: suspends first beacon only)
-// - /services/beacon/suspend/{serviceKeyHash} (new: suspends specific beacon)
+//   - /services/beacon/suspend (legacy: suspends first beacon only)
+//   - /services/beacon/suspend/{serviceKeyHash} (new: suspends specific beacon)
 func (sh *ServiceHandlers) HandleBeaconSuspend(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -812,10 +824,11 @@ func (sh *ServiceHandlers) HandleBeaconSuspend(w http.ResponseWriter, r *http.Re
 	log.Printf("Suspended service beacon: %s", actualServiceKeyHash)
 }
 
-// HandleBeaconKill implements the beacon kill endpoint
+// HandleBeaconKill implements the beacon kill endpoint to permanently stop
+// and remove a service beacon.
 // Supports both legacy (no hash) and new (with hash) URL patterns:
-// - /services/beacon/kill or /services/stop (legacy: kills first beacon only)
-// - /services/beacon/kill/{serviceKeyHash} (new: kills specific beacon)
+//   - /services/beacon/kill or /services/stop (legacy: kills first beacon only)
+//   - /services/beacon/kill/{serviceKeyHash} (new: kills specific beacon)
 func (sh *ServiceHandlers) HandleBeaconKill(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -890,7 +903,8 @@ func (sh *ServiceHandlers) HandleBeaconKill(w http.ResponseWriter, r *http.Reque
 	log.Printf("Killed service beacon: %s", actualServiceKeyHash)
 }
 
-// HandleFigs lists fig files in the configured figs directory and shows alias caches.
+// HandleFigs implements the /services/figs endpoint to list fig files in the
+// configured figs directory and display alias cache information.
 // If the request path ends with "/verbose", it includes full fig JSON content.
 func (sh *ServiceHandlers) HandleFigs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -1005,7 +1019,8 @@ func (sh *ServiceHandlers) HandleFigs(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-// HandleBeaconFigs returns signed fig files for all active service beacons.
+// HandleBeaconFigs implements the /services/beacons/figs endpoint to return
+// signed fig files for all active service beacons.
 // Request body may include {"nonce":"hex"} or {"requesterPeerId":"peerid"}.
 // If neither is provided, uses this node's peer ID as the requester.
 func (sh *ServiceHandlers) HandleBeaconFigs(w http.ResponseWriter, r *http.Request) {
@@ -1089,9 +1104,7 @@ func (sh *ServiceHandlers) HandleBeaconFigs(w http.ResponseWriter, r *http.Reque
 		g.keyHexes = append(g.keyHexes, keyHex)
 		g.keyHashes = append(g.keyHashes, keyHash)
 		if tpls := b.GetFigTemplates(); len(tpls) > 0 {
-			for _, tpl := range tpls {
-				g.templates = append(g.templates, tpl)
-			}
+			g.templates = append(g.templates, tpls...)
 		}
 	}
 
@@ -1233,7 +1246,8 @@ func (sh *ServiceHandlers) HandleBeaconFigs(w http.ResponseWriter, r *http.Reque
 	_ = json.NewEncoder(w).Encode(out)
 }
 
-// HandleServiceFigByKey returns a signed fig file for a specific service key.
+// HandleServiceFigByKey implements the /services/fig/{key} endpoint to return
+// a signed fig file for a specific service key.
 // URL format: /services/fig/{compressedPublicKeyHex}
 // Request body may include either {"nonce":"hex"} or {"requesterPeerId":"peerid"}.
 // This endpoint allows another node to request a signed fig file for a specific service key
@@ -1423,7 +1437,8 @@ func (sh *ServiceHandlers) HandleServiceFigByKey(w http.ResponseWriter, r *http.
 	log.Printf("Returned signed fig for service key %s (alias: %s)", keyHash, alias)
 }
 
-// HandleServices lists services configured in the services directory and shows beacon statuses.
+// HandleServices implements the /services/list endpoint to list services configured
+// in the services directory and display active beacon statuses.
 // If the request path ends with "/verbose", it includes full fig JSON content for each configured fig.
 func (sh *ServiceHandlers) HandleServices(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -2356,9 +2371,9 @@ func (sh *ServiceHandlers) startLocatorFromKey(keyHex string) (map[string]interf
 	}
 	if err := sh.node.GetServiceManager().StartServiceLocator(pubKey, types.ServiceBeaconModeLookup); err != nil {
 		if strings.Contains(err.Error(), "already exists") {
-			return nil, http.StatusConflict, fmt.Errorf("Service locator already exists for this service")
+			return nil, http.StatusConflict, fmt.Errorf("service locator already exists for this service")
 		}
-		return nil, http.StatusInternalServerError, fmt.Errorf("Failed to start service locator: %v", err)
+		return nil, http.StatusInternalServerError, fmt.Errorf("failed to start service locator: %v", err)
 	}
 	// Normalize key to canonical marshaled form and remember for /locators
 	if marshaled, e2 := crypto.MarshalPublicKey(pubKey); e2 == nil {

@@ -16,7 +16,8 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// WebSocketHandlers provides WebSocket-related HTTP endpoint handlers
+// WebSocketHandlers provides HTTP endpoint handlers for WebSocket connections
+// that enable real-time event streaming to clients.
 type WebSocketHandlers struct {
 	hub *wsHub.Hub
 }
@@ -28,7 +29,9 @@ func NewWebSocketHandlers(hub *wsHub.Hub) *WebSocketHandlers {
 	}
 }
 
-// HandleEventSubscribe handles WebSocket connections from clients wanting to subscribe to events
+// HandleEventSubscribe handles the /events/subscribe WebSocket endpoint for
+// clients to subscribe to real-time events from the node including peer connections,
+// service discoveries, and proxy requests.
 func (wh *WebSocketHandlers) HandleEventSubscribe(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -54,21 +57,14 @@ func (wh *WebSocketHandlers) HandleEventSubscribe(w http.ResponseWriter, r *http
 		}()
 
 		// Send events to client
-		for {
-			select {
-			case event, ok := <-client.GetSendChannel():
-				if !ok {
-					wsConn.WriteMessage(websocket.CloseMessage, []byte{})
-					return
-				}
-
-				wsConn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-				if err := wsConn.WriteJSON(event); err != nil {
-					log.Printf("Failed to send event to client %s: %v", client.GetID(), err)
-					return
-				}
+		for event := range client.GetSendChannel() {
+			wsConn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if err := wsConn.WriteJSON(event); err != nil {
+				log.Printf("Failed to send event to client %s: %v", client.GetID(), err)
+				return
 			}
 		}
+		wsConn.WriteMessage(websocket.CloseMessage, []byte{})
 	}()
 
 	// Keep connection alive and handle close

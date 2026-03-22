@@ -1,3 +1,11 @@
+// Package connection provides peer connection tracking and management for the
+// Banyan network. It maintains connection state, handles peer lookups via DHT
+// and GossipSub, and manages HTTP capability testing for bidirectional
+// communication.
+//
+// The package tracks peer connection types (manual, gossip lookup, HTTP verified,
+// background), manages unique peer aliases for easy reference, and provides
+// methods for connecting to peers using multiple discovery mechanisms.
 package connection
 
 import (
@@ -23,7 +31,10 @@ import (
 
 // Note: PeerManager interface is now defined in interfaces package
 
-// Manager manages peer connections and tracking
+// Manager handles peer connection tracking, discovery, and HTTP capability
+// testing. It maintains a registry of tracked peers with their connection
+// status, aliases, and service keys. The manager supports multiple connection
+// types and provides DHT and GossipSub-based peer lookup functionality.
 type Manager struct {
 	host             host.Host
 	ctx              context.Context
@@ -39,7 +50,9 @@ type Manager struct {
 	gossipTopic *pubsub.Topic
 }
 
-// NewManager creates a new connection manager
+// NewManager creates a new connection manager with the given libp2p host,
+// context, HTTP transport, DHT instance, gossip topic, and event broadcaster.
+// The manager will use the DHT and gossip topic for peer discovery operations.
 func NewManager(host host.Host, ctx context.Context, httpTransport *http.Transport,
 	dht *dht.IpfsDHT, gossipTopic *pubsub.Topic, eventBroadcaster interfaces.EventBroadcaster) interfaces.PeerManager {
 	return &Manager{
@@ -55,14 +68,16 @@ func NewManager(host host.Host, ctx context.Context, httpTransport *http.Transpo
 	}
 }
 
-// sendEvent sends an event via the event broadcaster
+// sendEvent sends an event via the event broadcaster if one is configured.
 func (m *Manager) sendEvent(eventType string, data interface{}) {
 	if m.eventBroadcaster != nil {
 		m.eventBroadcaster.SendEvent(eventType, data)
 	}
 }
 
-// AddTrackedPeer adds or updates a tracked peer using the provided options
+// AddTrackedPeer adds a peer to the connection tracking registry or updates
+// an existing peer entry. The options parameter specifies the connection type,
+// HTTP capability, and optional service key. Returns the connection item.
 func (m *Manager) AddTrackedPeer(peerID peer.ID, options types.PeerOptions) *types.ConnectionItem {
 	m.connectionsMutex.Lock()
 	defer m.connectionsMutex.Unlock()
@@ -92,7 +107,7 @@ func (m *Manager) AddTrackedPeer(peerID peer.ID, options types.PeerOptions) *typ
 			HTTPCapable:    options.HTTPCapable,
 			HTTPTestResult: types.HTTPTestUntested,
 		}
-		if options.ServiceKey != nil && len(options.ServiceKey) > 0 {
+		if len(options.ServiceKey) > 0 {
 			connItem.ServiceKeys = append(connItem.ServiceKeys, options.ServiceKey)
 		}
 		m.connections[peerID] = connItem
@@ -109,7 +124,7 @@ func (m *Manager) AddTrackedPeer(peerID peer.ID, options types.PeerOptions) *typ
 			"http_capable":    options.HTTPCapable,
 			"time":            time.Now(),
 		}
-		if options.ServiceKey != nil && len(options.ServiceKey) > 0 {
+		if len(options.ServiceKey) > 0 {
 			eventData["service_key"] = fmt.Sprintf("%x", options.ServiceKey[:min(8, len(options.ServiceKey))])
 		}
 
@@ -121,7 +136,7 @@ func (m *Manager) AddTrackedPeer(peerID peer.ID, options types.PeerOptions) *typ
 			connItem.HTTPCapable = options.HTTPCapable
 		}
 		// Update service key: append to list if new
-		if options.ServiceKey != nil && len(options.ServiceKey) > 0 {
+		if len(options.ServiceKey) > 0 {
 			found := false
 			for _, k := range connItem.ServiceKeys {
 				if len(k) == len(options.ServiceKey) {
@@ -150,6 +165,8 @@ func (m *Manager) AddTrackedPeer(peerID peer.ID, options types.PeerOptions) *typ
 	return connItem
 }
 
+// generateUniqueAliasLocked generates a unique 4-character alias for a peer.
+// Must be called with connectionsMutex held. Uses lowercase letters and digits.
 func (m *Manager) generateUniqueAliasLocked() string {
 	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 	const aliasLength = 4
@@ -172,7 +189,9 @@ func (m *Manager) generateUniqueAliasLocked() string {
 	}
 }
 
-// MarkPeerHTTPCapable marks a peer as HTTP capable
+// MarkPeerHTTPCapable marks a peer as HTTP capable with optional bidirectional
+// support. Updates the peer's HTTP test result to success and records the
+// test timestamp.
 func (m *Manager) MarkPeerHTTPCapable(peerID peer.ID, bidirectional bool) {
 	m.connectionsMutex.Lock()
 	defer m.connectionsMutex.Unlock()
@@ -195,7 +214,8 @@ func (m *Manager) MarkPeerHTTPCapable(peerID peer.ID, bidirectional bool) {
 	}
 }
 
-// MarkHTTPTestResult marks the HTTP test result for a peer
+// MarkHTTPTestResult records the HTTP capability test result for a peer.
+// Valid results include HTTPTestSuccess, HTTPTestFailed, and HTTPTestPending.
 func (m *Manager) MarkHTTPTestResult(peerID peer.ID, result string) {
 	m.connectionsMutex.Lock()
 	defer m.connectionsMutex.Unlock()
@@ -215,7 +235,8 @@ func (m *Manager) MarkHTTPTestResult(peerID peer.ID, result string) {
 	}
 }
 
-// CleanupOldConnections removes old disconnected connections
+// CleanupOldConnections removes disconnected peers that have been offline
+// for more than 30 minutes. Frees up alias slots for reuse.
 func (m *Manager) CleanupOldConnections() {
 	m.connectionsMutex.Lock()
 	defer m.connectionsMutex.Unlock()
@@ -230,7 +251,8 @@ func (m *Manager) CleanupOldConnections() {
 	}
 }
 
-// GetPeerByAlias returns peer ID by alias
+// GetPeerByAlias returns the peer ID associated with the given alias.
+// The second return value indicates whether the alias exists.
 func (m *Manager) GetPeerByAlias(alias string) (peer.ID, bool) {
 	m.connectionsMutex.RLock()
 	defer m.connectionsMutex.RUnlock()
@@ -239,7 +261,9 @@ func (m *Manager) GetPeerByAlias(alias string) (peer.ID, bool) {
 	return peerID, exists
 }
 
-// GetConnectionsCopy returns a copy of all connections
+// GetConnectionsCopy returns a snapshot copy of all tracked connections.
+// Safe for concurrent access; modifications to the returned map do not
+// affect the manager's internal state.
 func (m *Manager) GetConnectionsCopy() map[peer.ID]*types.ConnectionItem {
 	m.connectionsMutex.RLock()
 	defer m.connectionsMutex.RUnlock()
@@ -264,7 +288,8 @@ func (m *Manager) GetConnectionsCopy() map[peer.ID]*types.ConnectionItem {
 	return conns
 }
 
-// GetConnectionInfo returns connection info for a specific peer
+// GetConnectionInfo returns the connection item for a specific peer.
+// The second return value indicates whether the peer is being tracked.
 func (m *Manager) GetConnectionInfo(peerID peer.ID) (*types.ConnectionItem, bool) {
 	m.connectionsMutex.RLock()
 	defer m.connectionsMutex.RUnlock()
@@ -273,7 +298,9 @@ func (m *Manager) GetConnectionInfo(peerID peer.ID) (*types.ConnectionItem, bool
 	return conn, exists
 }
 
-// UpdateConnectionStatus updates the connection status for a peer
+// UpdateConnectionStatus updates the connection status for a tracked peer.
+// Also updates the last activity timestamp and handles disconnect/reconnect
+// state transitions.
 func (m *Manager) UpdateConnectionStatus(peerID peer.ID, status string) {
 	m.connectionsMutex.Lock()
 	defer m.connectionsMutex.Unlock()
@@ -292,7 +319,9 @@ func (m *Manager) UpdateConnectionStatus(peerID peer.ID, status string) {
 	}
 }
 
-// ConnectToPeer attempts to connect to a peer using DHT and gossipsub lookup
+// ConnectToPeer attempts to connect to a peer using DHT lookup first,
+// falling back to GossipSub-based peer discovery if DHT fails or is
+// unavailable. Returns nil if already connected or if lookup initiated.
 func (m *Manager) ConnectToPeer(peerID peer.ID) error {
 	if m.host.Network().Connectedness(peerID) == network.Connected {
 		return nil
@@ -334,7 +363,10 @@ func (m *Manager) ConnectToPeer(peerID peer.ID) error {
 	return nil
 }
 
-// LookupPeer searches for a peer using gossipsub and DHT
+// LookupPeer searches for a peer by publishing a lookup request to the
+// gossip network and optionally performing a DHT lookup in parallel.
+// If includeFrom is true, the request includes the sender's peer ID and
+// addresses to allow direct responses.
 func (m *Manager) LookupPeer(targetPeerID string, includeFrom bool) error {
 	req := types.LookupRequest{
 		Type:      "lookup",
@@ -408,7 +440,8 @@ func (m *Manager) LookupPeer(targetPeerID string, includeFrom bool) error {
 	return nil
 }
 
-// LookupPeerViaGossipsub performs a gossipsub-based peer lookup
+// LookupPeerViaGossipsub initiates a gossip-based peer lookup for the
+// given peer ID, including sender information for direct response.
 func (m *Manager) LookupPeerViaGossipsub(peerID peer.ID) {
 	m.sendEvent(types.EventDHTLookup, map[string]interface{}{
 		"message": "Starting gossipsub lookup for peer",
@@ -425,7 +458,9 @@ func (m *Manager) LookupPeerViaGossipsub(peerID peer.ID) {
 	}
 }
 
-// ConnectToRequesterDirectly attempts to connect directly to a peer using provided multiaddresses
+// ConnectToRequesterDirectly attempts to establish a direct connection to
+// a peer using a list of provided multiaddresses. Validates peer ID matches
+// and attempts each address until a successful connection is made.
 func (m *Manager) ConnectToRequesterDirectly(peerID peer.ID, addresses []string) {
 	m.sendEvent(types.EventConnection, map[string]interface{}{
 		"message":   "Attempting direct connection to lookup requester",
@@ -505,7 +540,9 @@ func (m *Manager) ConnectToRequesterDirectly(peerID peer.ID, addresses []string)
 	})
 }
 
-// HandleNewConnection handles new incoming connections
+// HandleNewConnection processes a new incoming connection from a peer.
+// Updates connection status and initiates bidirectional HTTP testing for
+// HTTP-capable or manually added peers.
 func (m *Manager) HandleNewConnection(peerID peer.ID) {
 	m.sendEvent(types.EventPeerConnected, map[string]interface{}{
 		"peer_id": peerID.String(),
@@ -536,7 +573,8 @@ func (m *Manager) HandleNewConnection(peerID peer.ID) {
 	}
 }
 
-// HandleDisconnection handles peer disconnections
+// HandleDisconnection processes a peer disconnection event. Updates the
+// peer's status and schedules cleanup of old disconnected peers.
 func (m *Manager) HandleDisconnection(peerID peer.ID) {
 	m.sendEvent(types.EventPeerDisconnected, map[string]interface{}{
 		"peer_id": peerID.String(),
@@ -550,7 +588,8 @@ func (m *Manager) HandleDisconnection(peerID peer.ID) {
 	})
 }
 
-// CreateBidirectionalConnections attempts to create connections back to all tracked HTTP-capable peers
+// CreateBidirectionalConnections tests bidirectional HTTP connectivity with
+// all tracked HTTP-capable peers. Each test runs concurrently in a goroutine.
 func (m *Manager) CreateBidirectionalConnections() {
 	connections := m.GetConnectionsCopy()
 	httpCapablePeers := make([]peer.ID, 0)
@@ -570,7 +609,9 @@ func (m *Manager) CreateBidirectionalConnections() {
 	}
 }
 
-// CreateBidirectionalConnection creates a connection back to a specific HTTP-capable peer
+// CreateBidirectionalConnection tests bidirectional HTTP connectivity with
+// a specific peer. Skips testing if already successfully tested within the
+// last 30 seconds.
 func (m *Manager) CreateBidirectionalConnection(peerID peer.ID) {
 	connItem, exists := m.GetConnectionInfo(peerID)
 	if !exists {
@@ -609,7 +650,9 @@ func (m *Manager) CreateBidirectionalConnection(peerID peer.ID) {
 	m.TestPeerHTTPCapability(peerID)
 }
 
-// TestPeerHTTPCapability tests if a peer has HTTP server capability
+// TestPeerHTTPCapability tests whether a peer has an HTTP server by sending
+// a ping request via libp2p HTTP transport. Marks the peer as HTTP capable
+// if the test succeeds.
 func (m *Manager) TestPeerHTTPCapability(peerID peer.ID) {
 	client := &http.Client{Transport: m.httpTransport}
 
