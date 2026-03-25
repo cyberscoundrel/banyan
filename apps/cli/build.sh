@@ -117,7 +117,7 @@ fi
 # Create output directories as needed
 [ "$BUILD_WINDOWS" = true ] && mkdir -p "$OUTPUT_DIR/win"
 [ "$BUILD_LINUX" = true ] && mkdir -p "$OUTPUT_DIR/linux"
-[ "$BUILD_MACOS_AMD64" = true ] || [ "$BUILD_MACOS_ARM64" = true ] && mkdir -p "$OUTPUT_DIR/osx"
+{ [ "$BUILD_MACOS_AMD64" = true ] || [ "$BUILD_MACOS_ARM64" = true ]; } && mkdir -p "$OUTPUT_DIR/osx"
 
 # Build Windows
 if [ "$BUILD_WINDOWS" = true ]; then

@@ -436,7 +436,11 @@ func handleFigTunnel(conn net.Conn, host string) {
 
 	// Open tunnel via management API
 	var portNum uint16
-	fmt.Sscanf(port, "%d", &portNum)
+	if _, err := fmt.Sscanf(port, "%d", &portNum); err != nil {
+		log.Printf("Invalid port number '%s': %v", port, err)
+		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
+		return
+	}
 
 	localPort, err := openTunnel(peerID, "localhost", portNum)
 	if err != nil {
@@ -509,7 +513,11 @@ func handlePeerTunnel(conn net.Conn, host string) {
 
 	// Open tunnel via management API
 	var portNum uint16
-	fmt.Sscanf(port, "%d", &portNum)
+	if _, err := fmt.Sscanf(port, "%d", &portNum); err != nil {
+		log.Printf("Invalid port number '%s': %v", port, err)
+		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
+		return
+	}
 
 	localPort, err := openTunnel(peerInfo.PeerID, "localhost", portNum)
 	if err != nil {
@@ -951,6 +959,10 @@ func resolveServiceKeyPrefix(prefix string) (string, string, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return "", "", fmt.Errorf("unexpected status code %d from connections endpoint", resp.StatusCode)
+	}
+
 	var result struct {
 		Connections []struct {
 			PeerID      string   `json:"peer_id"`
@@ -1002,7 +1014,11 @@ func handleSvcTunnel(conn net.Conn, host string) {
 	}
 
 	var portNum uint16
-	fmt.Sscanf(port, "%d", &portNum)
+	if _, err := fmt.Sscanf(port, "%d", &portNum); err != nil {
+		log.Printf("Invalid port number '%s': %v", port, err)
+		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
+		return
+	}
 
 	localPort, err := openTunnel(peerID, "localhost", portNum)
 	if err != nil {

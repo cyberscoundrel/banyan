@@ -130,7 +130,7 @@ if [ "$METADATA_ONLY" != true ]; then
     # Create output directories as needed
     [ "$BUILD_WINDOWS" = true ] && mkdir -p "$OUTPUT_DIR/win"
     [ "$BUILD_LINUX" = true ] && mkdir -p "$OUTPUT_DIR/linux"
-    [ "$BUILD_MACOS_AMD64" = true ] || [ "$BUILD_MACOS_ARM64" = true ] && mkdir -p "$OUTPUT_DIR/osx"
+    { [ "$BUILD_MACOS_AMD64" = true ] || [ "$BUILD_MACOS_ARM64" = true ]; } && mkdir -p "$OUTPUT_DIR/osx"
 
     # Create debug directories for each platform being built
     echo "📁 Creating debug folder structure..."
