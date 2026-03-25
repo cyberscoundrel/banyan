@@ -10,6 +10,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   main:
     runs-on: ubuntu-latest
@@ -19,7 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Required for nx affected commands
+          fetch-depth: 0
           submodules: recursive
 
       - name: Setup Node.js
@@ -32,7 +35,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: 'go.work'
-          cache: true
+          cache-dependency-path: |
+            go.work.sum
+            apps/node/go.sum
+            apps/cli/go.sum
+            apps/topology-gen/go.sum
+            packages/addon-sdk/go.sum
 
       - name: Cache Nx
         uses: actions/cache@v4
