@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -16,20 +17,16 @@ import (
 	"banyan/types"
 )
 
-// PeerHandlers provides HTTP endpoint handlers for peer management operations
-// including adding tracked peers and retrieving peer information.
 type PeerHandlers struct {
 	node *nodePkg.Node
 }
 
-// NewPeerHandlers creates a new PeerHandlers instance
 func NewPeerHandlers(node *nodePkg.Node) *PeerHandlers {
 	return &PeerHandlers{
 		node: node,
 	}
 }
 
-// isLocalhost checks if the request is coming from localhost
 func isLocalhost(r *http.Request) bool {
 	host := r.Host
 	if colonIndex := strings.Index(host, ":"); colonIndex != -1 {
@@ -38,11 +35,7 @@ func isLocalhost(r *http.Request) bool {
 	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
-// HandleAddTrackedPeer handles the /network/peers/add endpoint to manually add
-// a peer to tracking with optional connection attempt and HTTP capability marking.
-// This endpoint is restricted to localhost for security.
 func (ph *PeerHandlers) HandleAddTrackedPeer(w http.ResponseWriter, r *http.Request) {
-	// Restrict to localhost only
 	if !isLocalhost(r) {
 		http.Error(w, "Access denied: This endpoint is only accessible from localhost", http.StatusForbidden)
 		return
@@ -61,8 +54,9 @@ func (ph *PeerHandlers) HandleAddTrackedPeer(w http.ResponseWriter, r *http.Requ
 	var request struct {
 		PeerID      string   `json:"peer_id"`
 		Addresses   []string `json:"addresses"`
-		Connect     bool     `json:"connect,omitempty"`      // Whether to attempt connection
-		HTTPCapable bool     `json:"http_capable,omitempty"` // Mark as HTTP capable
+		Connect     bool     `json:"connect,omitempty"`
+		HTTPCapable bool     `json:"http_capable,omitempty"`
+		ServiceKey  string   `json:"service_key,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -80,14 +74,12 @@ func (ph *PeerHandlers) HandleAddTrackedPeer(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Parse and validate peer ID
 	peerID, err := peer.Decode(request.PeerID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid peer ID format: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	// Validate and parse multiaddresses
 	var validAddrs []multiaddr.Multiaddr
 	for _, addrStr := range request.Addresses {
 		addr, err := multiaddr.NewMultiaddr(addrStr)
@@ -98,65 +90,77 @@ func (ph *PeerHandlers) HandleAddTrackedPeer(w http.ResponseWriter, r *http.Requ
 		validAddrs = append(validAddrs, addr)
 	}
 
-	// Add peer to tracking
-	_ = ph.node.GetConnectionManager().AddTrackedPeer(peerID, types.NewManualPeerOptions(request.HTTPCapable))
+	var peerOptions types.PeerOptions
+	if request.ServiceKey != "" {
+		config := ph.node.GetConfig()
+		if config == nil || config.AllowUnsafeServiceKeyInjection == nil || !*config.AllowUnsafeServiceKeyInjection {
+			http.Error(w, "service_key injection requires --allow-unsafe-service-key-injection flag (SECURITY RISK - for testing only)", http.StatusForbidden)
+			return
+		}
+		serviceKeyBytes, err := hex.DecodeString(request.ServiceKey)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Invalid service_key format (expected hex): %v", err), http.StatusBadRequest)
+			return
+		}
+		peerOptions = types.NewServicePeerOptions(serviceKeyBytes, request.HTTPCapable)
+	} else {
+		peerOptions = types.NewManualPeerOptions(request.HTTPCapable)
+	}
+
+	_ = ph.node.GetConnectionManager().AddTrackedPeer(peerID, peerOptions)
 
 	response := map[string]interface{}{
 		"message":         "Peer added to tracking successfully",
 		"peer_id":         peerID.String(),
 		"addresses":       request.Addresses,
 		"http_capable":    request.HTTPCapable,
-		"connection_type": types.ConnTypeManual,
+		"connection_type": peerOptions.ConnectionType,
 		"timestamp":       time.Now(),
 	}
+	if request.ServiceKey != "" {
+		response["service_key"] = request.ServiceKey[:min(8, len(request.ServiceKey))] + "..."
+	}
 
-	// Attempt connection if requested
 	if request.Connect {
 		connected := false
 		var connectionError string
 
 		for _, addr := range validAddrs {
 			peerInfo, err := peer.AddrInfoFromP2pAddr(addr)
-			if err != nil {
-				// Try constructing AddrInfo manually
-				peerInfo = &peer.AddrInfo{
-					ID:    peerID,
-					Addrs: []multiaddr.Multiaddr{addr},
+				if err != nil {
+					peerInfo = &peer.AddrInfo{
+						ID:    peerID,
+						Addrs: []multiaddr.Multiaddr{addr},
+					}
+				}
+
+				ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+				err = ph.node.GetHost().Connect(ctx, *peerInfo)
+				cancel()
+
+				if err == nil {
+					connected = true
+					break
+				} else {
+					connectionError = err.Error()
 				}
 			}
 
-			// Attempt connection with timeout
-			ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-			err = ph.node.GetHost().Connect(ctx, *peerInfo)
-			cancel()
-
-			if err == nil {
-				connected = true
-				break
-			} else {
-				connectionError = err.Error()
+			response["connection_attempted"] = true
+			response["connected"] = connected
+			if !connected && connectionError != "" {
+				response["connection_error"] = connectionError
 			}
 		}
 
-		response["connection_attempted"] = true
-		response["connected"] = connected
-		if !connected && connectionError != "" {
-			response["connection_error"] = connectionError
-		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+
+		log.Printf("Added tracked peer: %s (connect=%v, success=%v)", peerID.String(), request.Connect, response["connected"])
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
-
-	log.Printf("Added tracked peer: %s (connect=%v, success=%v)", peerID.String(), request.Connect, response["connected"])
-}
-
-// HandleGetAllPeers handles the /network/peers/all endpoint to return information
-// about all tracked and untracked peers including connection status, service keys,
-// and HTTP capabilities. This endpoint is restricted to localhost for security.
 func (ph *PeerHandlers) HandleGetAllPeers(w http.ResponseWriter, r *http.Request) {
-	// Restrict to localhost only
 	if !isLocalhost(r) {
 		http.Error(w, "Access denied: This endpoint is only accessible from localhost", http.StatusForbidden)
 		return
@@ -172,7 +176,6 @@ func (ph *PeerHandlers) HandleGetAllPeers(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Get all currently connected libp2p peers
 	connectedPeers := ph.node.GetHost().Network().Peers()
 	connectedPeerMap := make(map[peer.ID]bool)
 	for _, p := range connectedPeers {
@@ -184,7 +187,6 @@ func (ph *PeerHandlers) HandleGetAllPeers(w http.ResponseWriter, r *http.Request
 	var trackedPeers []map[string]interface{}
 	var untrackedPeers []map[string]interface{}
 
-	// Process tracked peers
 	for peerID, connItem := range connectionsMap {
 		var serviceKeysArray []string
 
@@ -215,7 +217,6 @@ func (ph *PeerHandlers) HandleGetAllPeers(w http.ResponseWriter, r *http.Request
 			connInfo["last_http_test"] = *connItem.LastHTTPTest
 		}
 
-		// Add addresses if available
 		if connectedPeerMap[peerID] {
 			if conn := ph.node.GetHost().Network().ConnsToPeer(peerID); len(conn) > 0 {
 				var addrs []string
@@ -228,11 +229,9 @@ func (ph *PeerHandlers) HandleGetAllPeers(w http.ResponseWriter, r *http.Request
 
 		trackedPeers = append(trackedPeers, connInfo)
 
-		// Remove from connected map as we've processed it
 		delete(connectedPeerMap, peerID)
 	}
 
-	// Process remaining untracked but connected peers
 	for peerID := range connectedPeerMap {
 		connInfo := map[string]interface{}{
 			"peer_id":          peerID.String(),
@@ -241,7 +240,6 @@ func (ph *PeerHandlers) HandleGetAllPeers(w http.ResponseWriter, r *http.Request
 			"connection_type":  "untracked",
 		}
 
-		// Add addresses
 		if conn := ph.node.GetHost().Network().ConnsToPeer(peerID); len(conn) > 0 {
 			var addrs []string
 			for _, c := range conn {

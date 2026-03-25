@@ -27,6 +27,7 @@ __debug_bin*
 .vscode/
 .idea/
 .cursor/
+.config/
 
 # Nx cache
 .nx/
@@ -45,3 +46,17 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# Agentic/AI planning files
+# Ignore all root-level markdowns except standard ones
+/*.md
+!README.md
+!CHANGELOG.md
+!CONTRIBUTING.md
+!LICENSE.md
+!SECURITY.md
+!CODE_OF_CONDUCT.md
+
+# Local build artifacts
+apps/*/banyan
+apps/*/banyan-cli

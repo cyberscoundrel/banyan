@@ -98,6 +98,8 @@ type Config struct {
 	TunnelAuthToken *string
 	// TunnelAllowedTargets is the list of allowed target hosts for outbound tunnels.
 	TunnelAllowedTargets []string
+	// AllowUnsafeServiceKeyInjection allows manual service key injection via API (security risk, for testing only).
+	AllowUnsafeServiceKeyInjection *bool
 }
 
 // Node represents a Banyan libp2p node with HTTP proxy capabilities.
