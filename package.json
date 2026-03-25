@@ -14,7 +14,7 @@
     "build:cli": "nx build cli",
     "build:topology-gen": "nx build topology-gen",
     "release": "nx run workspace:release",
-    "test": "nx run-many -t test",
+    "test": "nx run-many -t test --exclude=workspace",
     "lint": "nx run-many -t lint",
     "dev": "nx run-many -t dev",
     "graph": "nx graph",

@@ -102,6 +102,16 @@ func (b *NodeBuilder) WithRouterConfig(path string) *NodeBuilder {
 	return b
 }
 
+func (b *NodeBuilder) WithAllowUnsafeServiceKeyInjection(enabled bool) *NodeBuilder {
+	b.config.AllowUnsafeServiceKeyInjection = &enabled
+	return b
+}
+
+func (b *NodeBuilder) WithBeaconIncludePeerIDAnnouncements(enabled bool) *NodeBuilder {
+	b.config.BeaconIncludePeerIDAnnouncements = &enabled
+	return b
+}
+
 func (b *NodeBuilder) Build() (*nodePkg.Node, error) {
 	return nodePkg.NewNode(b.ctx, b.config, b.keyLoader)
 }

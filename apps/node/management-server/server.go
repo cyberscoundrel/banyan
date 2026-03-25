@@ -190,6 +190,7 @@ func (ms *ManagementServer) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/proxy/peer/", proxyHandlers.HandleLibp2pProxy)
 	mux.HandleFunc("/proxy/alias/", proxyHandlers.HandleAliasProxy)
 	mux.HandleFunc("/proxy/service/", proxyHandlers.HandleServiceKeyProxy)
+	mux.HandleFunc("/proxy/service-key/", proxyHandlers.HandleServiceKeyPrefixProxy)
 
 	// Router management endpoints
 	mux.HandleFunc("/router/add", routerHandlers.HandleAddRoute)

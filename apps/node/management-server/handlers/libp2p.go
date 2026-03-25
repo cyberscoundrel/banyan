@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -100,12 +101,18 @@ func (lh *LibP2PHandlers) HandleConnections(w http.ResponseWriter, r *http.Reque
 	connections := make([]map[string]interface{}, 0, len(connectionsMap))
 
 	for peerID, connItem := range connectionsMap {
+		var serviceKeysArray []string
+		for _, serviceKey := range connItem.ServiceKeys {
+			serviceKeysArray = append(serviceKeysArray, fmt.Sprintf("%x", serviceKey))
+		}
+
 		connInfo := map[string]interface{}{
 			"peer_id":            peerID.String(),
 			"alias":              connItem.Alias,
 			"status":             connItem.Status,
 			"connected":          connItem.Connected,
 			"last_activity":      connItem.LastActivity,
+			"service_keys":       serviceKeysArray,
 			"connect_attempts":   connItem.ConnectAttempts,
 			"connection_type":    connItem.ConnectionType,
 			"http_capable":       connItem.HTTPCapable,

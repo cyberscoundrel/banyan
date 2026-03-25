@@ -13,6 +13,7 @@ concurrency:
 jobs:
   main:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -32,6 +33,14 @@ jobs:
         with:
           go-version-file: 'go.work'
           cache: true
+
+      - name: Cache Nx
+        uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('**/*.go', '**/go.mod', '**/go.sum', '**/*.ts', '**/*.tsx', 'package-lock.json') }}
+          restore-keys: |
+            nx-${{ runner.os }}-
 
       - name: Install dependencies
         run: npm ci
@@ -58,7 +67,11 @@ jobs:
 
       - name: Run affected test
         run: npx nx affected -t test --parallel=3 --verbose --exclude=transport-i2p,transport-nym,workspace
+        env:
+          NX_BUILD_PLATFORM: current
 
       - name: Run affected build
         run: npx nx affected -t build --parallel=3 --verbose --exclude=transport-i2p,transport-nym,workspace
+        env:
+          NX_BUILD_PLATFORM: current
 

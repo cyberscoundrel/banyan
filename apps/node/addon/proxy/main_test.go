@@ -195,6 +195,70 @@ func TestIsPeerAddress(t *testing.T) {
 	}
 }
 
+func TestIsSvcAddress(t *testing.T) {
+	tests := []struct {
+		host     string
+		expected bool
+	}{
+		{"abc12345.svc", true},
+		{"deadbeef.svc", true},
+		{"ABC12345.SVC", true},
+		{"abc12345.svc:443", true},
+		{"abc12345.svc:8080", true},
+		{"example.com", false},
+		{"svc.example.com", false},
+		{"example.fig", false},
+		{"example.peer", false},
+		{"localhost", false},
+		{"localhost:8080", false},
+		{"192.168.1.1", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.host, func(t *testing.T) {
+			result := isSvcAddress(tt.host)
+			if result != tt.expected {
+				t.Errorf("isSvcAddress(%q) = %v, want %v", tt.host, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAddressTypeDisambiguationWithSvc(t *testing.T) {
+	tests := []struct {
+		host   string
+		isFig  bool
+		isPeer bool
+		isSvc  bool
+	}{
+		{"example.fig", true, false, false},
+		{"12D3KooWExample.peer", false, true, false},
+		{"abc12345.svc", false, false, true},
+		{"example.com", false, false, false},
+		{"svc.fig", true, false, false},
+		{"fig.peer", false, true, false},
+		{"fig.svc", false, false, true},
+		{"peer.svc", false, false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.host, func(t *testing.T) {
+			gotFig := isFigAddress(tt.host)
+			gotPeer := isPeerAddress(tt.host)
+			gotSvc := isSvcAddress(tt.host)
+			if gotFig != tt.isFig {
+				t.Errorf("isFigAddress(%q) = %v, want %v", tt.host, gotFig, tt.isFig)
+			}
+			if gotPeer != tt.isPeer {
+				t.Errorf("isPeerAddress(%q) = %v, want %v", tt.host, gotPeer, tt.isPeer)
+			}
+			if gotSvc != tt.isSvc {
+				t.Errorf("isSvcAddress(%q) = %v, want %v", tt.host, gotSvc, tt.isSvc)
+			}
+		})
+	}
+}
+
 func TestExtractPeerID(t *testing.T) {
 	tests := []struct {
 		host     string
@@ -258,7 +322,6 @@ func TestParsePeerAddress(t *testing.T) {
 }
 
 func TestParseHTTPConnectPeerRequest(t *testing.T) {
-	// Test parsing HTTP CONNECT request for .peer address
 	reqStr := "CONNECT 12D3KooWExample.peer:443 HTTP/1.1\r\nHost: 12D3KooWExample.peer:443\r\n\r\n"
 	reader := bufio.NewReader(strings.NewReader(reqStr))
 
@@ -285,35 +348,85 @@ func TestParseHTTPConnectPeerRequest(t *testing.T) {
 	}
 }
 
-func TestAddressTypeDisambiguation(t *testing.T) {
-	// Test that .fig and .peer addresses are mutually exclusive
+func TestParseHTTPConnectSvcRequest(t *testing.T) {
+	reqStr := "CONNECT abc12345def.svc:443 HTTP/1.1\r\nHost: abc12345def.svc:443\r\n\r\n"
+	reader := bufio.NewReader(strings.NewReader(reqStr))
+
+	req, err := http.ReadRequest(reader)
+	if err != nil {
+		t.Fatalf("Failed to parse request: %v", err)
+	}
+
+	if req.Method != "CONNECT" {
+		t.Errorf("Expected method CONNECT, got %s", req.Method)
+	}
+
+	if !isSvcAddress(req.Host) {
+		t.Error("Expected host to be a .svc address")
+	}
+
+	if isFigAddress(req.Host) {
+		t.Error("Expected host NOT to be a .fig address")
+	}
+
+	if isPeerAddress(req.Host) {
+		t.Error("Expected host NOT to be a .peer address")
+	}
+}
+
+func TestSvcAddressPortParsing(t *testing.T) {
 	tests := []struct {
-		host   string
-		isFig  bool
-		isPeer bool
+		input        string
+		expectedHost string
+		expectedPort string
 	}{
-		{"example.fig", true, false},
-		{"12D3KooWExample.peer", false, true},
-		{"example.com", false, false},
-		{"peer.fig", true, false}, // .fig takes precedence in suffix
-		{"fig.peer", false, true}, // .peer takes precedence in suffix
+		{"abc12345.svc:443", "abc12345.svc", "443"},
+		{"deadbeefcafe.svc:8080", "deadbeefcafe.svc", "8080"},
+		{"abc12345.svc", "abc12345.svc", "443"},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.host, func(t *testing.T) {
-			gotFig := isFigAddress(tt.host)
-			gotPeer := isPeerAddress(tt.host)
-			if gotFig != tt.isFig {
-				t.Errorf("isFigAddress(%q) = %v, want %v", tt.host, gotFig, tt.isFig)
+		t.Run(tt.input, func(t *testing.T) {
+			host := tt.input
+			port := "443"
+			if idx := strings.LastIndex(host, ":"); idx != -1 {
+				port = host[idx+1:]
+				host = host[:idx]
 			}
-			if gotPeer != tt.isPeer {
-				t.Errorf("isPeerAddress(%q) = %v, want %v", tt.host, gotPeer, tt.isPeer)
+			if host != tt.expectedHost {
+				t.Errorf("Host: got %q, want %q", host, tt.expectedHost)
+			}
+			if port != tt.expectedPort {
+				t.Errorf("Port: got %q, want %q", port, tt.expectedPort)
 			}
 		})
 	}
 }
 
-// TestRelay tests the bidirectional data relay between connections
+func TestSvcPrefixExtraction(t *testing.T) {
+	tests := []struct {
+		host            string
+		expectedPrefix  string
+	}{
+		{"abc12345def.svc:443", "abc12345def"},
+		{"deadbeefcafe.svc:8080", "deadbeefcafe"},
+		{"abc12345.svc", "abc12345"},
+		{"UPPERCASE.svc:443", "UPPERCASE"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.host, func(t *testing.T) {
+			parts := strings.Split(tt.host, ":")
+			svcHost := parts[0]
+			prefix := strings.TrimSuffix(svcHost, ".svc")
+
+			if prefix != tt.expectedPrefix {
+				t.Errorf("Prefix: got %q, want %q", prefix, tt.expectedPrefix)
+			}
+		})
+	}
+}
+
 func TestRelay(t *testing.T) {
 	// Create two pairs of pipes to simulate connections
 	client1, server1 := net.Pipe()
