@@ -11,6 +11,7 @@ WHATS_NEW=""
 METADATA_ONLY=false
 OUTPUT_DIR="bin"
 CLEAN=false
+PLATFORM="${NX_BUILD_PLATFORM:-all}"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -34,13 +35,19 @@ while [[ $# -gt 0 ]]; do
       CLEAN=true
       shift
       ;;
+    --platform)
+      PLATFORM="$2"
+      shift 2
+      ;;
     -h|--help)
-      echo "Usage: $0 [--version VERSION] [--whats-new DESCRIPTION] [--output DIR] [--clean] [--metadata-only]"
+      echo "Usage: $0 [--version VERSION] [--whats-new DESCRIPTION] [--output DIR] [--clean] [--metadata-only] [--platform PLATFORM]"
       echo "  --version       Version string in semver format (default: pre-release)"
       echo "  --whats-new     Comma-separated list of new features (default: smiley emoji)"
       echo "  --output        Output directory for builds (default: bin)"
       echo "  --clean         Clean previous builds before building"
       echo "  --metadata-only Only regenerate release metadata (no compilation)"
+      echo "  --platform      Platform to build: all, current, linux, windows, macos-amd64, macos-arm64"
+      echo "                  (default: all, or \$NX_BUILD_PLATFORM if set)"
       exit 0
       ;;
     *)
@@ -50,10 +57,21 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Resolve 'current' to actual platform
+if [ "$PLATFORM" = "current" ]; then
+    case "$(uname -s)" in
+        Linux*)   PLATFORM="linux";;
+        Darwin*)  PLATFORM="macos-$(uname -m)";;  # arm64 or x86_64
+        MINGW*|MSYS*|CYGWIN*) PLATFORM="windows";;
+        *)        PLATFORM="linux";;  # Default to linux for unknown
+    esac
+    echo "🔍 Detected current platform: $PLATFORM"
+fi
+
 if [ "$METADATA_ONLY" = true ]; then
     echo "🔄 Regenerating release metadata only..."
 else
-    echo "🌳 Building Banyan for all platforms..."
+    echo "🌳 Building Banyan for platform: $PLATFORM"
     echo "📁 Output directory: $OUTPUT_DIR"
 fi
 echo ""
@@ -65,6 +83,42 @@ BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Build flags
 LDFLAGS="-s -w -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}"
 
+# Determine which platforms to build
+BUILD_WINDOWS=false
+BUILD_LINUX=false
+BUILD_MACOS_AMD64=false
+BUILD_MACOS_ARM64=false
+
+case "$PLATFORM" in
+    all)
+        BUILD_WINDOWS=true
+        BUILD_LINUX=true
+        BUILD_MACOS_AMD64=true
+        BUILD_MACOS_ARM64=true
+        ;;
+    linux)
+        BUILD_LINUX=true
+        ;;
+    windows)
+        BUILD_WINDOWS=true
+        ;;
+    macos-amd64|macos-x86_64)
+        BUILD_MACOS_AMD64=true
+        ;;
+    macos-arm64|macos-aarch64)
+        BUILD_MACOS_ARM64=true
+        ;;
+    macos)
+        BUILD_MACOS_AMD64=true
+        BUILD_MACOS_ARM64=true
+        ;;
+    *)
+        echo "❌ Unknown platform: $PLATFORM"
+        echo "   Valid options: all, current, linux, windows, macos, macos-amd64, macos-arm64"
+        exit 1
+        ;;
+esac
+
 # Clean if requested
 if [ "$CLEAN" = true ] && [ "$METADATA_ONLY" != true ]; then
     echo "🧹 Cleaning previous builds..."
@@ -73,63 +127,70 @@ fi
 
 # Skip building if metadata only
 if [ "$METADATA_ONLY" != true ]; then
-    # Create output directories if they don't exist
-    mkdir -p "$OUTPUT_DIR/win" "$OUTPUT_DIR/linux" "$OUTPUT_DIR/osx"
+    # Create output directories as needed
+    [ "$BUILD_WINDOWS" = true ] && mkdir -p "$OUTPUT_DIR/win"
+    [ "$BUILD_LINUX" = true ] && mkdir -p "$OUTPUT_DIR/linux"
+    { [ "$BUILD_MACOS_AMD64" = true ] || [ "$BUILD_MACOS_ARM64" = true ]; } && mkdir -p "$OUTPUT_DIR/osx"
 
-    # Create debug directories for each platform
+    # Create debug directories for each platform being built
     echo "📁 Creating debug folder structure..."
-    for platform in win linux osx; do
+    for platform in $( [ "$BUILD_WINDOWS" = true ] && echo "win" ) $( [ "$BUILD_LINUX" = true ] && echo "linux" ) $( ([ "$BUILD_MACOS_AMD64" = true ] || [ "$BUILD_MACOS_ARM64" = true ]) && echo "osx" ); do
         for subdir in addons figs services; do
             mkdir -p "$OUTPUT_DIR/debug/$platform/$subdir"
         done
     done
-    echo "   Created debug/{win,linux,osx}/{addons,figs,services}"
+    echo "   Created debug directories"
 else
     # For metadata only, just ensure output directory exists
     mkdir -p "$OUTPUT_DIR"
 fi
 
 if [ "$METADATA_ONLY" != true ]; then
-    echo "📦 Building for Windows (amd64)..."
-    GOOS=windows GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o "$OUTPUT_DIR/win/banyan.exe" .
-    echo "✅ Windows build complete: $OUTPUT_DIR/win/banyan.exe"
-
-    echo ""
-    echo "🐧 Building for Linux (amd64)..."
-    GOOS=linux GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o "$OUTPUT_DIR/linux/banyan" .
-    echo "✅ Linux build complete: $OUTPUT_DIR/linux/banyan"
-
-    echo ""
-    echo "🍎 Building for macOS (amd64)..."
-    GOOS=darwin GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o "$OUTPUT_DIR/osx/banyan-amd64" .
-    echo "✅ macOS AMD64 build complete: $OUTPUT_DIR/osx/banyan-amd64"
-
-    echo ""
-    echo "🍎 Building for macOS (arm64 - Apple Silicon)..."
-    GOOS=darwin GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o "$OUTPUT_DIR/osx/banyan-arm64" .
-    echo "✅ macOS ARM64 build complete: $OUTPUT_DIR/osx/banyan-arm64"
-
-    # Copy debug startup scripts to each platform directory
-    echo ""
-    echo "📜 Copying debug startup scripts..."
     SCRIPTS_DIR="$(dirname "$0")/scripts"
-
-    # Windows - copy .bat and .ps1 scripts
-    if [ -f "$SCRIPTS_DIR/start-debug.ps1" ]; then
-        cp "$SCRIPTS_DIR/start-debug.ps1" "$OUTPUT_DIR/win/start-debug.ps1"
-        cp "$SCRIPTS_DIR/start-debug.bat" "$OUTPUT_DIR/win/start-debug.bat"
-        echo "   Copied Windows debug scripts"
+    
+    if [ "$BUILD_WINDOWS" = true ]; then
+        echo "📦 Building for Windows (amd64)..."
+        GOOS=windows GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o "$OUTPUT_DIR/win/banyan.exe" .
+        echo "✅ Windows build complete: $OUTPUT_DIR/win/banyan.exe"
+        
+        # Copy debug startup scripts
+        if [ -f "$SCRIPTS_DIR/start-debug.ps1" ]; then
+            cp "$SCRIPTS_DIR/start-debug.ps1" "$OUTPUT_DIR/win/start-debug.ps1"
+            cp "$SCRIPTS_DIR/start-debug.bat" "$OUTPUT_DIR/win/start-debug.bat"
+            echo "   Copied Windows debug scripts"
+        fi
     fi
 
-    # Linux - copy .sh script
-    if [ -f "$SCRIPTS_DIR/start-debug.sh" ]; then
-        cp "$SCRIPTS_DIR/start-debug.sh" "$OUTPUT_DIR/linux/start-debug.sh"
-        chmod +x "$OUTPUT_DIR/linux/start-debug.sh"
-        echo "   Copied Linux debug script"
+    if [ "$BUILD_LINUX" = true ]; then
+        echo ""
+        echo "🐧 Building for Linux (amd64)..."
+        GOOS=linux GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o "$OUTPUT_DIR/linux/banyan" .
+        echo "✅ Linux build complete: $OUTPUT_DIR/linux/banyan"
+        
+        # Copy debug startup script
+        if [ -f "$SCRIPTS_DIR/start-debug.sh" ]; then
+            cp "$SCRIPTS_DIR/start-debug.sh" "$OUTPUT_DIR/linux/start-debug.sh"
+            chmod +x "$OUTPUT_DIR/linux/start-debug.sh"
+            echo "   Copied Linux debug script"
+        fi
     fi
 
-    # macOS - copy .sh script
-    if [ -f "$SCRIPTS_DIR/start-debug.sh" ]; then
+    if [ "$BUILD_MACOS_AMD64" = true ]; then
+        echo ""
+        echo "🍎 Building for macOS (amd64)..."
+        GOOS=darwin GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o "$OUTPUT_DIR/osx/banyan-amd64" .
+        echo "✅ macOS AMD64 build complete: $OUTPUT_DIR/osx/banyan-amd64"
+    fi
+
+    if [ "$BUILD_MACOS_ARM64" = true ]; then
+        echo ""
+        echo "🍎 Building for macOS (arm64 - Apple Silicon)..."
+        GOOS=darwin GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o "$OUTPUT_DIR/osx/banyan-arm64" .
+        echo "✅ macOS ARM64 build complete: $OUTPUT_DIR/osx/banyan-arm64"
+    fi
+
+    # Copy macOS debug script if any macOS build was done
+    if ([ "$BUILD_MACOS_AMD64" = true ] || [ "$BUILD_MACOS_ARM64" = true ]) && [ -f "$SCRIPTS_DIR/start-debug.sh" ]; then
         cp "$SCRIPTS_DIR/start-debug.sh" "$OUTPUT_DIR/osx/start-debug.sh"
         chmod +x "$OUTPUT_DIR/osx/start-debug.sh"
         echo "   Copied macOS debug script"

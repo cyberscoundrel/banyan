@@ -109,6 +109,8 @@ type NodeConfigFile struct {
 	TunnelAuthToken *string `json:"tunnelAuthToken,omitempty"`
 	// TunnelAllowedTargets specifies allowed target hosts for tunnels.
 	TunnelAllowedTargets []string `json:"tunnelAllowedTargets,omitempty"`
+	// AllowUnsafeServiceKeyInjection allows manual service key injection via API (SECURITY RISK).
+	AllowUnsafeServiceKeyInjection *bool `json:"allowUnsafeServiceKeyInjection,omitempty"`
 }
 
 // Command line flags for node configuration.
@@ -138,6 +140,8 @@ var (
 	// Tunnel configuration flags
 	tunnelEnabled   = flag.Bool("tunnel-enabled", true, "Enable TCP tunnel protocol handler for peer-to-peer TCP tunneling")
 	tunnelAuthToken = flag.String("tunnel-auth-token", "", "Auth token required for tunnel API endpoints (optional)")
+	// Unsafe testing flags
+	allowUnsafeServiceKeyInjection = flag.Bool("allow-unsafe-service-key-injection", false, "Allow manual injection of service keys via API (SECURITY RISK - for testing only)")
 )
 
 // main is the entry point for the Banyan node.
@@ -181,6 +185,9 @@ func main() {
 	}
 	if allowInsecureFigs != nil && *allowInsecureFigs {
 		fmt.Println("WARNING: Allowing INSECURE fig files with invalid/missing signatures (SECURITY RISK)")
+	}
+	if allowUnsafeServiceKeyInjection != nil && *allowUnsafeServiceKeyInjection {
+		fmt.Println("WARNING: Allowing UNSAFE service key injection via API (SECURITY RISK - for testing only)")
 	}
 
 	// Start management API server
@@ -377,9 +384,10 @@ func loadConfig() (*nodePkg.Config, error) {
 		OverrideTransportRestrictions:    boolValue("override-transport-restrictions", overrideTransportRestrictions, fileConfig.OverrideTransportRestrictions, false),
 		Bootstraps:                       bootstraps, // Bootstraps can only be set via config file
 		// Tunnel configuration
-		TunnelEnabled:        boolValue("tunnel-enabled", tunnelEnabled, fileConfig.TunnelEnabled, true),
-		TunnelAuthToken:      stringValue(tunnelAuthToken, fileConfig.TunnelAuthToken),
-		TunnelAllowedTargets: fileConfig.TunnelAllowedTargets, // Can only be set via config file
+		TunnelEnabled:                   boolValue("tunnel-enabled", tunnelEnabled, fileConfig.TunnelEnabled, true),
+		TunnelAuthToken:                 stringValue(tunnelAuthToken, fileConfig.TunnelAuthToken),
+		TunnelAllowedTargets:            fileConfig.TunnelAllowedTargets, // Can only be set via config file
+		AllowUnsafeServiceKeyInjection:  boolValue("allow-unsafe-service-key-injection", allowUnsafeServiceKeyInjection, fileConfig.AllowUnsafeServiceKeyInjection, false),
 	}
 
 	// Handle addonsDir separately since it's not part of node.Config

@@ -222,14 +222,15 @@ func (ph *ProxyHandlers) HandleServiceKeyProxy(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Update request URL and forward to peer proxy handler
 	var originalPath string
-	newPath := fmt.Sprintf("/proxy/peer/%s/%s", selectedPeer.String(), remainingPath)
 	if remainingPath != "" {
 		originalPath = fmt.Sprintf("/proxy/service/%s/%s", requestBody.CompressedPublicKey, remainingPath)
 	} else {
 		originalPath = fmt.Sprintf("/proxy/service/%s", requestBody.CompressedPublicKey)
 	}
+
+	// Route through the receiving peer's route table to reach the backend service
+	newPath := fmt.Sprintf("/proxy/peer/%s/router/%s/%s", selectedPeer.String(), requestBody.CompressedPublicKey, remainingPath)
 	r.URL.Path = newPath
 
 	log.Printf("Service key proxy: %s -> %s (service key: %s, peer: %s)", originalPath, newPath, requestBody.CompressedPublicKey, selectedPeer.String())
@@ -369,8 +370,8 @@ func (ph *ProxyHandlers) HandleAliasProxy(w http.ResponseWriter, r *http.Request
 	}
 
 	// Construct new URL for peer proxy using the stripped path
-	// Use direct path - the receiving peer will handle the request
-	newPath := fmt.Sprintf("/proxy/peer/%s/%s", selectedPeer.String(), pathToForward)
+	// Route through the receiving peer's route table to reach the backend service
+	newPath := fmt.Sprintf("/proxy/peer/%s/router/%s/%s", selectedPeer.String(), selectedKey, pathToForward)
 
 	// Update request URL and forward to peer proxy handler
 	originalPath := r.URL.Path
@@ -380,5 +381,77 @@ func (ph *ProxyHandlers) HandleAliasProxy(w http.ResponseWriter, r *http.Request
 	log.Printf("Alias proxy: %s -> %s (alias: %s, peer: %s, service key: %s, stripped path: %s)", originalPath, newPath, alias, selectedPeer.String(), selectedKey, pathToForward)
 
 	// Forward to the peer proxy handler
+	ph.HandleLibp2pProxy(w, r)
+}
+
+// HandleServiceKeyPrefixProxy handles /proxy/service-key/{prefix}/{path}
+// It resolves a key prefix to a full service key and routes through the route table.
+// This is similar to git's abbreviated commit hashes - a minimum of 8 characters is required.
+func (ph *ProxyHandlers) HandleServiceKeyPrefixProxy(w http.ResponseWriter, r *http.Request) {
+	if ph.node == nil {
+		http.Error(w, "LibP2P node not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Extract prefix and path from URL: /proxy/service-key/{prefix}/{path}
+	path := strings.TrimPrefix(r.URL.Path, "/proxy/service-key/")
+	if path == "" || path == "/" {
+		http.Error(w, "Missing service key prefix. Format: /proxy/service-key/{prefix}/{path}", http.StatusBadRequest)
+		return
+	}
+
+	parts := strings.SplitN(path, "/", 2)
+
+	if len(parts) == 0 || parts[0] == "" {
+		http.Error(w, "Missing service key prefix", http.StatusBadRequest)
+		return
+	}
+
+	prefix := strings.ToLower(strings.TrimSpace(parts[0]))
+	remainingPath := ""
+	if len(parts) > 1 {
+		remainingPath = parts[1]
+	}
+
+	if len(prefix) < 8 {
+		http.Error(w, "Service key prefix must be at least 8 characters", http.StatusBadRequest)
+		return
+	}
+
+	// Search all connections for matching service keys
+	connections := ph.node.GetConnectionManager().GetConnectionsCopy()
+	var matchingKeys []string
+	keyToPeer := make(map[string]peer.ID)
+
+	for pid, conn := range connections {
+		for _, svcKey := range conn.ServiceKeys {
+			keyHex := fmt.Sprintf("%x", svcKey)
+			if strings.HasPrefix(strings.ToLower(keyHex), prefix) {
+				matchingKeys = append(matchingKeys, keyHex)
+				keyToPeer[keyHex] = pid
+			}
+		}
+	}
+
+	if len(matchingKeys) == 0 {
+		http.Error(w, fmt.Sprintf("No service key found matching prefix '%s'", prefix), http.StatusNotFound)
+		return
+	}
+
+	if len(matchingKeys) > 1 {
+		http.Error(w, fmt.Sprintf("Ambiguous prefix '%s' matches %d keys: %v", prefix, len(matchingKeys), matchingKeys), http.StatusBadRequest)
+		return
+	}
+
+	// Exactly one match
+	selectedKey := matchingKeys[0]
+	selectedPeer := keyToPeer[selectedKey]
+
+	log.Printf("Service key prefix proxy: resolved prefix '%s' to key '%s' on peer %s", prefix, selectedKey, selectedPeer.String())
+
+	// Route through the receiving peer's route table to reach the backend service
+	newPath := fmt.Sprintf("/proxy/peer/%s/router/%s/%s", selectedPeer.String(), selectedKey, remainingPath)
+	r.URL.Path = newPath
+
 	ph.HandleLibp2pProxy(w, r)
 }

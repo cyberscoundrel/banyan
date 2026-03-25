@@ -164,11 +164,14 @@ func handleHTTPConnect(conn net.Conn, req *http.Request) {
 		host = host + ":443"
 	}
 
-	if isFigAddress(host) {
+	switch {
+	case isFigAddress(host):
 		handleFigTunnel(conn, host)
-	} else if isPeerAddress(host) {
+	case isSvcAddress(host):
+		handleSvcTunnel(conn, host)
+	case isPeerAddress(host):
 		handlePeerTunnel(conn, host)
-	} else {
+	default:
 		// Direct tunnel to internet
 		target, err := net.Dial("tcp", host)
 		if err != nil {
@@ -202,11 +205,14 @@ func handleHTTPProxy(conn net.Conn, req *http.Request, reader *bufio.Reader) {
 		host = req.URL.Host
 	}
 
-	if isFigAddress(host) {
+	switch {
+	case isFigAddress(host):
 		handleFigHTTPRequest(conn, req, host)
-	} else if isPeerAddress(host) {
+	case isSvcAddress(host):
+		handleSvcHTTPRequest(conn, req, host)
+	case isPeerAddress(host):
 		handlePeerHTTPRequest(conn, req, host)
-	} else {
+	default:
 		// Direct proxy to internet
 		proxyReq, err := http.NewRequest(req.Method, targetURL, req.Body)
 		if err != nil {
@@ -243,6 +249,14 @@ func isPeerAddress(host string) bool {
 		h = h[:idx]
 	}
 	return strings.HasSuffix(strings.ToLower(h), ".peer")
+}
+
+func isSvcAddress(host string) bool {
+	h := host
+	if idx := strings.LastIndex(h, ":"); idx != -1 {
+		h = h[:idx]
+	}
+	return strings.HasSuffix(strings.ToLower(h), ".svc")
 }
 
 // peerAddressInfo contains parsed components from a .peer hostname.
@@ -422,7 +436,11 @@ func handleFigTunnel(conn net.Conn, host string) {
 
 	// Open tunnel via management API
 	var portNum uint16
-	fmt.Sscanf(port, "%d", &portNum)
+	if _, err := fmt.Sscanf(port, "%d", &portNum); err != nil {
+		log.Printf("Invalid port number '%s': %v", port, err)
+		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
+		return
+	}
 
 	localPort, err := openTunnel(peerID, "localhost", portNum)
 	if err != nil {
@@ -495,7 +513,11 @@ func handlePeerTunnel(conn net.Conn, host string) {
 
 	// Open tunnel via management API
 	var portNum uint16
-	fmt.Sscanf(port, "%d", &portNum)
+	if _, err := fmt.Sscanf(port, "%d", &portNum); err != nil {
+		log.Printf("Invalid port number '%s': %v", port, err)
+		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
+		return
+	}
 
 	localPort, err := openTunnel(peerInfo.PeerID, "localhost", portNum)
 	if err != nil {
@@ -828,12 +850,15 @@ func handleSOCKS5(conn net.Conn) {
 	}
 	targetPort = uint16(portBuf[0])<<8 | uint16(portBuf[1])
 
-	// Handle .fig and .peer addresses
-	if isFigAddress(targetHost) {
+	// Handle .fig, .svc, and .peer addresses
+	switch {
+	case isFigAddress(targetHost):
 		handleSOCKS5Fig(conn, targetHost, targetPort)
-	} else if isPeerAddress(targetHost) {
+	case isSvcAddress(targetHost):
+		handleSOCKS5Svc(conn, targetHost, targetPort)
+	case isPeerAddress(targetHost):
 		handleSOCKS5Peer(conn, targetHost, targetPort)
-	} else {
+	default:
 		handleSOCKS5Direct(conn, targetHost, targetPort)
 	}
 }
@@ -920,6 +945,153 @@ func handleSOCKS5Peer(conn net.Conn, host string, port uint16) {
 	defer tunnelConn.Close()
 
 	// Success reply with localhost bind address
+	reply := []byte{0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1}
+	reply = append(reply, byte(localPort>>8), byte(localPort&0xff))
+	conn.Write(reply)
+
+	relay(conn, tunnelConn)
+}
+
+func resolveServiceKeyPrefix(prefix string) (string, string, error) {
+	resp, err := http.Get(managerURL + "/network/connections")
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get connections: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", "", fmt.Errorf("unexpected status code %d from connections endpoint", resp.StatusCode)
+	}
+
+	var result struct {
+		Connections []struct {
+			PeerID      string   `json:"peer_id"`
+			ServiceKeys []string `json:"service_keys"`
+		} `json:"connections"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", "", fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	var matchingKeys []string
+	var matchingPeerID string
+	prefixLower := strings.ToLower(prefix)
+
+	for _, conn := range result.Connections {
+		for _, key := range conn.ServiceKeys {
+			if strings.HasPrefix(strings.ToLower(key), prefixLower) {
+				matchingKeys = append(matchingKeys, key)
+				matchingPeerID = conn.PeerID
+			}
+		}
+	}
+
+	if len(matchingKeys) == 0 {
+		return "", "", fmt.Errorf("no service key found matching prefix '%s'", prefix)
+	}
+	if len(matchingKeys) > 1 {
+		return "", "", fmt.Errorf("ambiguous prefix matches %d keys: %v", len(matchingKeys), matchingKeys)
+	}
+
+	return matchingPeerID, matchingKeys[0], nil
+}
+
+func handleSvcTunnel(conn net.Conn, host string) {
+	parts := strings.Split(host, ":")
+	svcHost := parts[0]
+	port := "443"
+	if len(parts) > 1 {
+		port = parts[1]
+	}
+
+	prefix := strings.TrimSuffix(svcHost, ".svc")
+
+	peerID, _, err := resolveServiceKeyPrefix(prefix)
+	if err != nil {
+		log.Printf("Failed to resolve service key prefix %s: %v", prefix, err)
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
+	}
+
+	var portNum uint16
+	if _, err := fmt.Sscanf(port, "%d", &portNum); err != nil {
+		log.Printf("Invalid port number '%s': %v", port, err)
+		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
+		return
+	}
+
+	localPort, err := openTunnel(peerID, "localhost", portNum)
+	if err != nil {
+		log.Printf("Failed to open tunnel: %v", err)
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
+	}
+
+	tunnelConn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
+	if err != nil {
+		log.Printf("Failed to connect to tunnel: %v", err)
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
+	}
+	defer tunnelConn.Close()
+
+	conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+	relay(conn, tunnelConn)
+}
+
+func handleSvcHTTPRequest(conn net.Conn, req *http.Request, host string) {
+	parts := strings.Split(host, ":")
+	svcHost := parts[0]
+	prefix := strings.TrimSuffix(svcHost, ".svc")
+
+	proxyURL := fmt.Sprintf("%s/proxy/service-key/%s%s", managerURL, prefix, req.URL.Path)
+	if req.URL.RawQuery != "" {
+		proxyURL += "?" + req.URL.RawQuery
+	}
+
+	proxyReq, err := http.NewRequest(req.Method, proxyURL, req.Body)
+	if err != nil {
+		conn.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"))
+		return
+	}
+	proxyReq.Header = req.Header
+
+	client := &http.Client{}
+	resp, err := client.Do(proxyReq)
+	if err != nil {
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
+	}
+	defer resp.Body.Close()
+
+	resp.Write(conn)
+}
+
+func handleSOCKS5Svc(conn net.Conn, host string, port uint16) {
+	prefix := strings.TrimSuffix(host, ".svc")
+
+	peerID, _, err := resolveServiceKeyPrefix(prefix)
+	if err != nil {
+		log.Printf("Failed to resolve service key prefix %s: %v", prefix, err)
+		conn.Write([]byte{0x05, 0x04, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+		return
+	}
+
+	localPort, err := openTunnel(peerID, "localhost", port)
+	if err != nil {
+		log.Printf("Failed to open tunnel: %v", err)
+		conn.Write([]byte{0x05, 0x04, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+		return
+	}
+
+	tunnelConn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
+	if err != nil {
+		log.Printf("Failed to connect to tunnel: %v", err)
+		conn.Write([]byte{0x05, 0x04, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+		return
+	}
+	defer tunnelConn.Close()
+
 	reply := []byte{0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1}
 	reply = append(reply, byte(localPort>>8), byte(localPort&0xff))
 	conn.Write(reply)
