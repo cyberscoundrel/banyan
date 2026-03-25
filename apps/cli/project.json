@@ -11,7 +11,7 @@
     "build": {
       "executor": "nx:run-commands",
       "dependsOn": ["web:build"],
-      "inputs": ["go", "{workspaceRoot}/apps/web/dist/**/*"],
+      "inputs": ["go", "{workspaceRoot}/apps/web/dist/**/*", { "env": "NX_BUILD_PLATFORM" }],
       "outputs": ["{workspaceRoot}/dist/apps/cli"],
       "options": {
         "cwd": "apps/cli",
