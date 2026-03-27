@@ -1,0 +1,12 @@
+{
+  "chat-ledger-key": {
+    "directory": "chat-ledger-key",
+    "pem": "chat-ledger-key.pem",
+    "fig": "chat-fig.json"
+  },
+  "chat-static-key": {
+    "directory": "chat-static-key",
+    "pem": "chat-static-key.pem",
+    "fig": "chat-fig.json"
+  }
+}

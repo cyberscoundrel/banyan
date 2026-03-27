@@ -1,0 +1,36 @@
+{
+  "serviceAlias": "chat-fig",
+  "root": {
+    "path": "/",
+    "keys": [
+      "080112208c19dd6354eab1e536895fcee62a9f7456e785998d8aa58688ea47163071cf32"
+    ],
+    "children": [
+      {
+        "path": "/ledger",
+        "keys": [
+          "08011220d9894ecf4a6c9d05f16a1af07cd0c3698e834802fd9ceff93983ff7c3cd54311"
+        ]
+      },
+      {
+        "path": "/mod",
+        "keys": [
+          "080112203818975261daa04210b51795ecf6171b0939db7450b098685467c4dc175c0e6b"
+        ]
+      },
+      {
+        "path": "/admin",
+        "keys": [
+          "080112208f4503c474c96cedc89eac2346dcae9a7cf770ca759fcdd8760595b1e728f836"
+        ]
+      }
+    ]
+  },
+  "expiresAt": "2026-04-26T00:12:52.308769-05:00",
+  "requiredSigners": [
+    "08011220a5f9ad9115cafd4d49a04c0dc09e261ce1e470a50bda249da677d9ff492eab20"
+  ],
+  "authoritySignatures": [
+    "211276079bbf314141e8aab86356b3e772843b80f1ff905400547817a3ced8d156d7215c9e7abe10bb7c9691fd16a87d9533ef45662f6ac6e7b829d66c706605"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "chat-static-key": {
+    "directory": "chat-static-key",
+    "pem": "chat-static-key.pem",
+    "fig": "chat-fig.json"
+  }
+}
