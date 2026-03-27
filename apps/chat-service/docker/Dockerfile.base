@@ -1,0 +1,39 @@
+FROM golang:1.24-alpine AS go-builder
+
+RUN apk add --no-cache git ca-certificates tzdata
+
+WORKDIR /build
+
+FROM node:18-alpine AS node-builder
+
+RUN apk add --no-cache git
+
+WORKDIR /build
+
+FROM alpine:3.19 AS base
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY --from=go-builder /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOPATH="/go"
+ENV PATH="${GOPATH}/bin:${PATH}"
+
+COPY --from=node-builder /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-builder /usr/lib/libnode.so.111 /usr/lib/libnode.so.111
+COPY --from=node-builder /usr/lib/libnode.so /usr/lib/libnode.so
+COPY --from=node-builder /usr/local/lib/node_modules /usr/local/lib/node_modules
+ENV PATH="/usr/local/bin:${PATH}"
+
+RUN mkdir -p /app/data /app/keys /app/config
+
+ENV GOROOT="/usr/local/go"
+ENV GOPATH="/go"
+
+VOLUME ["/app/data", "/app/keys", "/app/config"]
+
+EXPOSE 8080
+
+ENTRYPOINT ["/app/chat-service"]

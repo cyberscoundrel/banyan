@@ -1,0 +1,62 @@
+ARG GO_VERSION=1.24
+
+FROM golang:${GO_VERSION}-alpine AS go-builder
+
+RUN apk add --no-cache git ca-certificates tzdata build-base
+
+WORKDIR /build
+
+COPY go.work ./
+COPY packages/ledger/go.mod packages/ledger/go.sum ./packages/ledger/
+COPY apps/chat-service/go.mod apps/chat-service/go.sum ./apps/chat-service/
+
+WORKDIR /build/apps/chat-service
+RUN go mod download
+
+COPY packages/ledger/ ../../packages/ledger/
+COPY apps/chat-service/ ./
+
+RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o chat-service .
+
+FROM node:18-alpine AS frontend-builder
+
+WORKDIR /build
+
+COPY apps/chat-frontend/package*.json ./
+RUN npm ci
+
+COPY apps/chat-frontend/ ./
+RUN npm run build
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata sqlite-libs netcat-openbsd
+
+WORKDIR /app
+
+RUN addgroup -g 1000 chat && \
+    adduser -u 1000 -G chat -s /bin/sh -D chat
+
+COPY --from=go-builder /build/apps/chat-service/chat-service /app/chat-service
+COPY --from=frontend-builder /build/dist /app/frontend/dist
+
+RUN mkdir -p /app/data /app/keys /app/config && \
+    chown -R chat:chat /app
+
+COPY apps/chat-service/docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+ENV NODE_TYPE=ledger
+ENV STATIC_KEY=true
+ENV LEDGER_KEY=true
+ENV MOD_KEY=false
+ENV ADMIN_KEY=false
+
+VOLUME ["/app/data", "/app/keys"]
+
+EXPOSE 8080
+
+USER chat
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["-static-key", "-ledger-key"]
