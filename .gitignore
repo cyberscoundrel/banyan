@@ -60,3 +60,9 @@ temp/
 # Local build artifacts
 apps/*/banyan
 apps/*/banyan-cli
+apps/chat-service/chat-service
+apps/chat-service/data/
+apps/chat-frontend/dist/
+
+# Generated topology (keep config, ignore output for production)
+# apps/chat-service/topology/output/
