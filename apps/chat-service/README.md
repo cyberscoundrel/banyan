@@ -137,6 +137,69 @@ apps/
     └── package.json
 ```
 
+## Key Management
+
+Keys are **NOT** baked into Docker images. They are mounted at runtime from `topology/output/keys/` via volumes.
+
+### Key Management Script
+
+```bash
+cd apps/chat-service/topology
+
+# Initialize all keys and figs
+./keys.sh init
+
+# List all keys
+./keys.sh list
+
+# Rotate a specific key (e.g., if compromised)
+./keys.sh rotate chat-ledger-key
+
+# Rotate all service keys (keeps authority)
+./keys.sh rotate-all
+
+# Regenerate fig files with current keys
+./keys.sh regenerate-figs
+
+# Export public keys for distribution
+./keys.sh export ./public-keys
+```
+
+### Key Rotation Workflow
+
+When a key is compromised:
+
+1. **Identify the compromised key** (e.g., `chat-ledger-key`)
+2. **Rotate the key**: `./keys.sh rotate chat-ledger-key`
+   - Generates new private key
+   - Updates key mapping
+   - Regenerates all fig files
+   - Re-signs with authority key
+3. **Redistribute keys**:
+   - Export public keys: `./keys.sh export ./new-keys`
+   - Copy new private keys to affected nodes
+   - Restart affected containers
+4. **Revoke old access**:
+   - Old key is replaced in all fig files
+   - Nodes with old key can no longer authenticate
+
+### Key Security
+
+| Key Type | Location | Distribution |
+|----------|----------|--------------|
+| `chat-authority` | `keys/authority/` | Keep offline, highly secured |
+| `chat-admin-key` | `keys/` | Admin nodes only |
+| `chat-mod-key` | `keys/` | Moderator nodes only |
+| `chat-ledger-key` | `keys/` | Ledger nodes only |
+| `chat-static-key` | `keys/` | All nodes |
+
+**Best Practices:**
+- Store authority key offline (air-gapped or HSM)
+- Use different keys for different trust levels
+- Rotate keys immediately if compromised
+- Limit distribution of admin/mod keys
+- Monitor for unauthorized key usage
+
 ## License
 
 MIT
