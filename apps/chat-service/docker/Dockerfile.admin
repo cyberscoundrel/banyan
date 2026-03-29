@@ -1,46 +1,21 @@
-ARG GO_VERSION=1.24
+FROM node:18-alpine
 
-FROM golang:${GO_VERSION}-alpine AS go-builder
-
-RUN apk add --no-cache git ca-certificates tzdata build-base
-
-WORKDIR /build
-
-COPY go.work ./
-COPY packages/ledger/go.mod packages/ledger/go.sum ./packages/ledger/
-COPY apps/chat-service/go.mod apps/chat-service/go.sum ./apps/chat-service/
-
-WORKDIR /build/apps/chat-service
-RUN go mod download
-
-COPY packages/ledger/ ../../packages/ledger/
-COPY apps/chat-service/ ./
-
-RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o chat-service .
-
-FROM node:18-alpine AS frontend-builder
-
-WORKDIR /build
-
-COPY apps/chat-frontend/package*.json ./
-RUN npm ci
-
-COPY apps/chat-frontend/ ./
-RUN npm run build
-
-FROM alpine:3.19
-
-RUN apk add --no-cache ca-certificates tzdata sqlite-libs netcat-openbsd
+RUN apk add --no-cache python3 make g++ sqlite
 
 WORKDIR /app
 
-RUN addgroup -g 1000 chat && \
-    adduser -u 1000 -G chat -s /bin/sh -D chat
+COPY apps/chat-service/package*.json ./
+RUN npm ci --only=production
 
-COPY --from=go-builder /build/apps/chat-service/chat-service /app/chat-service
-COPY --from=frontend-builder /build/dist /app/frontend/dist
+COPY apps/chat-service/src ./src
+COPY apps/chat-service/tsconfig.json ./
+RUN npm run build
+
+COPY apps/chat-frontend/dist ./frontend/dist
 
 RUN mkdir -p /app/data /app/keys /app/config && \
+    addgroup -g 1000 chat && \
+    adduser -u 1000 -G chat -s /bin/sh -D chat && \
     chown -R chat:chat /app
 
 COPY apps/chat-service/docker/entrypoint.sh /app/entrypoint.sh

@@ -25,8 +25,8 @@ build_image() {
     echo ""
 }
 
-echo "Building Banyan Chat Service Docker Images"
-echo "==========================================="
+echo "Building Banyan Chat Service Docker Images (Node.js)"
+echo "====================================================="
 echo "Project root: $PROJECT_ROOT"
 echo "Version: $VERSION"
 echo "Build date: $BUILD_DATE"
@@ -37,7 +37,7 @@ build_image "$SCRIPT_DIR/Dockerfile.ledger" "banyan-chat-ledger" "$VERSION"
 build_image "$SCRIPT_DIR/Dockerfile.mod" "banyan-chat-mod" "$VERSION"
 build_image "$SCRIPT_DIR/Dockerfile.admin" "banyan-chat-admin" "$VERSION"
 
-echo "==========================================="
+echo "====================================================="
 echo "All images built successfully!"
 echo ""
 echo "Images:"
