@@ -31,7 +31,6 @@ A decentralized chat application demonstrating Banyan's P2P capabilities.
 
 ### Prerequisites
 
-- Go 1.24+
 - Node.js 18+
 
 ### Build
@@ -43,20 +42,20 @@ make -C apps/chat-service build
 # Or manually:
 cd apps/chat-frontend && npm install && npm run build
 cp -r dist ../chat-service/frontend/
-cd ../chat-service && go build .
+cd ../chat-service && npm install && npm run build
 ```
 
 ### Run
 
 ```bash
 # Run with ledger key (can accept posts)
-./apps/chat-service/chat-service -ledger-key
+node apps/chat-service/dist/index.js --ledger-key
 
 # Run with all keys
-./apps/chat-service/chat-service -ledger-key -mod-key -admin-key
+node apps/chat-service/dist/index.js --ledger-key --mod-key --admin-key
 
 # Run with config file
-./apps/chat-service/chat-service -config config.example.json
+node apps/chat-service/dist/index.js --config config.example.json
 ```
 
 ### Development
@@ -117,13 +116,17 @@ make -C apps/chat-service dev
 
 ```
 apps/
-├── chat-service/          # Go backend service
-│   ├── main.go           # Entry point
-│   ├── handlers.go       # HTTP handlers
-│   ├── websocket.go      # WebSocket hub
-│   ├── auth.go           # Authentication
-│   ├── forward.go        # Request forwarding
-│   ├── embed.go          # Frontend embedding
+├── chat-service/          # Node.js backend service
+│   ├── src/
+│   │   ├── index.ts       # Entry point
+│   │   ├── server.ts      # Express server setup
+│   │   ├── config.ts      # Configuration
+│   │   ├── websocket.ts   # WebSocket hub
+│   │   ├── auth.ts        # Authentication
+│   │   ├── handlers/      # Route handlers
+│   │   └── ledger/        # Ledger/CRDT
+│   ├── dist/             # Compiled JavaScript
+│   ├── package.json
 │   └── frontend/         # Embedded frontend dist
 │
 └── chat-frontend/         # React frontend
@@ -132,13 +135,6 @@ apps/
     │   ├── api/          # HTTP client
     │   └── ws/           # WebSocket client
     └── package.json
-
-packages/
-└── ledger/               # Ledger/CRDT package
-    ├── ledger.go         # Core types
-    ├── crdt.go           # CRDT merge
-    ├── storage.go        # SQLite persistence
-    └── sync.go           # HTTP sync
 ```
 
 ## License
