@@ -380,6 +380,9 @@ func NewNode(ctx context.Context, config *Config, keyLoader PrivateKeyLoader) (*
 		node.tunnelHandler = tunnelPkg.NewHandler(h, ctx, func(format string, v ...interface{}) {
 			fmt.Printf("[tunnel] "+format+"\n", v...)
 		})
+		node.tunnelHandler.SetRouteLookup(func(identifier string) (string, bool) {
+			return routeTable.GetRoute(identifier)
+		})
 		// Set allowed targets from config
 		if len(config.TunnelAllowedTargets) > 0 {
 			node.tunnelHandler.SetAllowedTargets(config.TunnelAllowedTargets)

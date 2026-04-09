@@ -3,7 +3,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'crypto';
 import { Entry, EntryType, State, BanData, DeleteData, PromoteData } from '../ledger/index.js';
 import { SQLiteStorage } from '../ledger/storage.js';
-import { SyncManager } from '../ledger/sync.js';
 import { WebSocketHub } from '../websocket.js';
 import { getUserRole } from '../ledger/crdt.js';
 
@@ -15,8 +14,8 @@ function hashEntry(entry: Omit<Entry, 'hash'>): string {
 export function createModHandlers(
   storage: SQLiteStorage,
   state: State,
-  syncManager: SyncManager | null,
-  hub: WebSocketHub
+  hub: WebSocketHub,
+  syncBroadcast?: (entries: Entry[]) => void,
 ) {
   function banUser(req: Request, res: Response): void {
     if (!req.peerId) {
@@ -58,7 +57,7 @@ export function createModHandlers(
     });
 
     hub.broadcast('mod:ban', { peerId, reason });
-    syncManager?.pushToPeers([fullEntry]);
+    syncBroadcast?.([fullEntry]);
 
     res.json({ success: true });
   }
@@ -104,7 +103,7 @@ export function createModHandlers(
     post.deleted = true;
 
     hub.broadcast('post:delete', { postId, reason, moderator: req.peerId });
-    syncManager?.pushToPeers([fullEntry]);
+    syncBroadcast?.([fullEntry]);
 
     res.json({ success: true });
   }
@@ -154,7 +153,7 @@ export function createModHandlers(
     });
 
     hub.broadcast('mod:promote', { peerId, role });
-    syncManager?.pushToPeers([fullEntry]);
+    syncBroadcast?.([fullEntry]);
 
     res.json({ success: true });
   }

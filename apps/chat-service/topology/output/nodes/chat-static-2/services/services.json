@@ -2,6 +2,8 @@
   "chat-static-key": {
     "directory": "chat-static-key",
     "pem": "chat-static-key.pem",
-    "fig": "chat-fig.json"
+    "fig": "chat-fig.json",
+    "routeUrl": "http://127.0.0.1:8080",
+    "keepFullPath": true
   }
 }

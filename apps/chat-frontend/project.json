@@ -1,0 +1,32 @@
+{
+  "name": "chat-frontend",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/chat-frontend/src",
+  "tags": ["type:app", "lang:typescript"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "inputs": ["typescript", "{projectRoot}/index.html", "{projectRoot}/postcss.config.js", "{projectRoot}/tailwind.config.js", "{projectRoot}/vite.config.ts"],
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/chat-frontend",
+        "command": "tsc && vite build"
+      }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/chat-frontend",
+        "command": "vite"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/chat-frontend",
+        "command": "vite preview"
+      }
+    }
+  }
+}

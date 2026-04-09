@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/network"
@@ -111,6 +112,10 @@ func (ph *ProxyHandlers) HandleLibp2pProxy(w http.ResponseWriter, r *http.Reques
 			proxyReq.Header.Add(key, value)
 		}
 	}
+
+	// Inject the local node's peer identity so the remote node can
+	// forward it to the downstream service.
+	proxyReq.Header.Set("X-Libp2p-PeerID", ph.node.GetHost().ID().String())
 
 	// Make the request through libp2p
 	resp, err := client.Do(proxyReq)
@@ -300,21 +305,9 @@ func (ph *ProxyHandlers) HandleAliasProxy(w http.ResponseWriter, r *http.Request
 		matchedKeys, matchedPath = figData.FindKeysAndMatchedPath(requestPath)
 		log.Printf("Hierarchical path match for alias '%s' path '%s': found %d keys, matched path '%s'", alias, requestPath, len(matchedKeys), matchedPath)
 
-		// Strip the matched path prefix to get the path to forward to the backend
-		if matchedPath != "" && matchedPath != "/" {
-			// Remove the matched prefix from the request path
-			pathToForward = strings.TrimPrefix(requestPath, matchedPath)
-			// Ensure it starts with / or is empty
-			if pathToForward != "" && !strings.HasPrefix(pathToForward, "/") {
-				pathToForward = "/" + pathToForward
-			}
-			// Remove leading slash for forwarding (will be added back later)
-			pathToForward = strings.TrimPrefix(pathToForward, "/")
-		} else {
-			// Root path or no match, forward the full path
-			pathToForward = remainingPath
-		}
-		log.Printf("Path to forward: '%s' (stripped '%s' from '%s')", pathToForward, matchedPath, requestPath)
+		// Always forward the full original path to preserve backend routing
+		pathToForward = remainingPath
+		log.Printf("Path to forward: '%s'", pathToForward)
 	} else {
 		// Fallback to all service keys if fig data not available
 		matchedKeys = serviceKeys
@@ -454,4 +447,275 @@ func (ph *ProxyHandlers) HandleServiceKeyPrefixProxy(w http.ResponseWriter, r *h
 	r.URL.Path = newPath
 
 	ph.HandleLibp2pProxy(w, r)
+}
+
+// HandleAliasBroadcast handles /proxy/alias/broadcast/{alias}/{path} to fan out
+// a request to ALL connected peers that have the matched service key. It uses
+// the same hierarchical path matching as HandleAliasProxy to resolve the path
+// to a service key, then fans out concurrently.
+func (ph *ProxyHandlers) HandleAliasBroadcast(w http.ResponseWriter, r *http.Request) {
+	if ph.node == nil {
+		http.Error(w, "LibP2P node not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/proxy/alias/broadcast/")
+	if path == "" || path == "/" {
+		http.Error(w, "Missing alias in path. Format: /proxy/alias/broadcast/{alias}/{path}", http.StatusBadRequest)
+		return
+	}
+
+	slashIndex := strings.Index(path, "/")
+	var alias, remainingPath string
+	if slashIndex == -1 {
+		alias = path
+		remainingPath = ""
+	} else {
+		alias = path[:slashIndex]
+		remainingPath = path[slashIndex+1:]
+	}
+
+	if alias == "" {
+		http.Error(w, "Empty alias in path", http.StatusBadRequest)
+		return
+	}
+
+	desiredAddon := strings.TrimSpace(r.URL.Query().Get("addon"))
+	serviceKeys, ok := GetServiceKeysForAlias(alias, desiredAddon)
+	if !ok || len(serviceKeys) == 0 {
+		http.Error(w, fmt.Sprintf("Alias '%s' not loaded. Call /find first to load service keys.", alias), http.StatusPreconditionRequired)
+		return
+	}
+
+	figData, hasFigData := GetFigDataForAlias(alias, desiredAddon)
+	var matchedKeys []string
+	var pathToForward string
+
+	if hasFigData {
+		requestPath := "/" + remainingPath
+		matchedKeys, _ := figData.FindKeysAndMatchedPath(requestPath)
+		log.Printf("Broadcast path match for alias '%s' path '%s': found %d keys", alias, requestPath, len(matchedKeys))
+
+		pathToForward = remainingPath
+	} else {
+		matchedKeys = serviceKeys
+		pathToForward = remainingPath
+	}
+
+	if len(matchedKeys) == 0 {
+		http.Error(w, fmt.Sprintf("No keys found for path '%s' in alias '%s'", "/"+remainingPath, alias), http.StatusNotFound)
+		return
+	}
+
+	peers := ph.findPeersForKeys(matchedKeys)
+	if len(peers) == 0 {
+		http.Error(w, fmt.Sprintf("No connected peers for alias '%s'", alias), http.StatusBadGateway)
+		return
+	}
+
+	ph.fanOutToPeers(w, r, peers, matchedKeys, pathToForward, alias)
+}
+
+// HandleServiceKeyPrefixBroadcast handles /proxy/service-key/broadcast/{prefix}/{path}
+// to fan out a request to all peers that have a matching service key.
+func (ph *ProxyHandlers) HandleServiceKeyPrefixBroadcast(w http.ResponseWriter, r *http.Request) {
+	if ph.node == nil {
+		http.Error(w, "LibP2P node not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/proxy/service-key/broadcast/")
+	if path == "" || path == "/" {
+		http.Error(w, "Missing service key prefix", http.StatusBadRequest)
+		return
+	}
+
+	parts := strings.SplitN(path, "/", 2)
+	if len(parts) == 0 || parts[0] == "" {
+		http.Error(w, "Missing service key prefix", http.StatusBadRequest)
+		return
+	}
+
+	prefix := strings.ToLower(strings.TrimSpace(parts[0]))
+	remainingPath := ""
+	if len(parts) > 1 {
+		remainingPath = parts[1]
+	}
+
+	if len(prefix) < 8 {
+		http.Error(w, "Service key prefix must be at least 8 characters", http.StatusBadRequest)
+		return
+	}
+
+	connections := ph.node.GetConnectionManager().GetConnectionsCopy()
+	var matchedKeys []string
+	keyToPeers := make(map[string][]peer.ID)
+
+	for pid, conn := range connections {
+		for _, svcKey := range conn.ServiceKeys {
+			keyHex := fmt.Sprintf("%x", svcKey)
+			if strings.HasPrefix(strings.ToLower(keyHex), prefix) {
+				matchedKeys = append(matchedKeys, keyHex)
+				keyToPeers[keyHex] = append(keyToPeers[keyHex], pid)
+			}
+		}
+	}
+
+	if len(matchedKeys) == 0 {
+		http.Error(w, fmt.Sprintf("No service key found matching prefix '%s'", prefix), http.StatusNotFound)
+		return
+	}
+
+	var peers []peer.ID
+	seen := make(map[string]bool)
+	for _, pids := range keyToPeers {
+		for _, pid := range pids {
+			pidStr := pid.String()
+			if !seen[pidStr] {
+				peers = append(peers, pid)
+				seen[pidStr] = true
+			}
+		}
+	}
+
+	log.Printf("Service key broadcast: prefix '%s' matched %d keys on %d peers", prefix, len(matchedKeys), len(peers))
+	ph.fanOutToPeers(w, r, peers, matchedKeys, remainingPath, prefix)
+}
+
+// findPeersForKeys returns all unique connected peers that have any of the given service keys.
+func (ph *ProxyHandlers) findPeersForKeys(keys []string) []peer.ID {
+	connections := ph.node.GetConnectionManager().GetConnectionsCopy()
+	var peers []peer.ID
+	seen := make(map[string]bool)
+
+	for pid, conn := range connections {
+		for _, keyHex := range keys {
+			for _, svcKey := range conn.ServiceKeys {
+				if fmt.Sprintf("%x", svcKey) == strings.ToLower(strings.TrimSpace(keyHex)) {
+					pidStr := pid.String()
+					if !seen[pidStr] {
+						peers = append(peers, pid)
+						seen[pidStr] = true
+					}
+				}
+			}
+		}
+	}
+
+	return peers
+}
+
+// fanOutToPeers fans out an HTTP request to multiple peers concurrently and returns
+// an aggregated response. For each peer, it picks the first matched key and routes
+// through the peer's route table.
+func (ph *ProxyHandlers) fanOutToPeers(w http.ResponseWriter, r *http.Request, peers []peer.ID, matchedKeys []string, pathToForward string, label string) {
+	type fanResult struct {
+		peerID  peer.ID
+		status  int
+		body    []byte
+		headers http.Header
+		err     error
+	}
+
+	results := make([]fanResult, len(peers))
+	var wg sync.WaitGroup
+
+	for i, pid := range peers {
+		wg.Add(1)
+		go func(idx int, p peer.ID) {
+			defer wg.Done()
+			selectedKey := matchedKeys[0]
+			newPath := fmt.Sprintf("/proxy/peer/%s/router/%s/%s", p.String(), selectedKey, pathToForward)
+
+			proxyReq, err := http.NewRequestWithContext(r.Context(), r.Method, newPath, r.Body)
+			if err != nil {
+				results[idx] = fanResult{peerID: p, err: err}
+				return
+			}
+
+			for key, values := range r.Header {
+				for _, value := range values {
+					proxyReq.Header.Add(key, value)
+				}
+			}
+			proxyReq.Header.Set("X-Libp2p-PeerID", ph.node.GetHost().ID().String())
+			proxyReq.Header.Del("X-Banyan-Broadcast")
+
+			client := &http.Client{Transport: ph.node.GetHTTPTransport()}
+			ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+			defer cancel()
+
+			resp, err := client.Do(proxyReq.WithContext(ctx))
+			if err != nil {
+				results[idx] = fanResult{peerID: p, err: err}
+				return
+			}
+			defer resp.Body.Close()
+
+			body, _ := io.ReadAll(resp.Body)
+			results[idx] = fanResult{peerID: p, status: resp.StatusCode, body: body, headers: resp.Header}
+		}(i, pid)
+	}
+
+	wg.Wait()
+
+	allFailed := true
+	for _, res := range results {
+		if res.err == nil && res.status < 500 {
+			allFailed = false
+			break
+		}
+	}
+
+	if allFailed {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadGateway)
+		errs := make([]string, 0)
+		for _, res := range results {
+			if res.err != nil {
+				errs = append(errs, fmt.Sprintf("%s: %v", res.peerID, res.err))
+			} else {
+				errs = append(errs, fmt.Sprintf("%s: HTTP %d", res.peerID, res.status))
+			}
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error":      "all peers failed",
+			"label":      label,
+			"peer_count": len(peers),
+			"errors":     errs,
+		})
+		return
+	}
+
+	var successCount int
+	var failCount int
+	var lastSuccessHeaders http.Header
+	var lastSuccessStatus int
+	var lastSuccessBody []byte
+
+	for _, res := range results {
+		if res.err != nil {
+			failCount++
+			continue
+		}
+		if res.status >= 400 {
+			failCount++
+			continue
+		}
+		successCount++
+		lastSuccessHeaders = res.headers
+		lastSuccessStatus = res.status
+		lastSuccessBody = res.body
+	}
+
+	log.Printf("Broadcast to %s: %d/%d peers succeeded", label, successCount, len(peers))
+
+	for key, values := range lastSuccessHeaders {
+		for _, value := range values {
+			w.Header().Add(key, value)
+		}
+	}
+	w.Header().Set("X-Banyan-Broadcast-Results", fmt.Sprintf("%d/%d", successCount, len(peers)))
+	w.WriteHeader(lastSuccessStatus)
+	w.Write(lastSuccessBody)
 }

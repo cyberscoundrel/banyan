@@ -3,7 +3,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'crypto';
 import { Entry, EntryType, State, IssueKeyData, RevokeData } from '../ledger/index.js';
 import { SQLiteStorage } from '../ledger/storage.js';
-import { SyncManager } from '../ledger/sync.js';
 import { WebSocketHub } from '../websocket.js';
 
 function hashEntry(entry: Omit<Entry, 'hash'>): string {
@@ -23,9 +22,9 @@ export interface ServiceKey {
 export function createAdminHandlers(
   storage: SQLiteStorage,
   state: State,
-  syncManager: SyncManager | null,
   hub: WebSocketHub,
-  keys: Map<string, ServiceKey>
+  keys: Map<string, ServiceKey>,
+  syncBroadcast?: (entries: Entry[]) => void,
 ) {
   function issueKey(req: Request, res: Response): void {
     if (!req.peerId) {
@@ -78,7 +77,7 @@ export function createAdminHandlers(
     keys.set(keyId, key);
 
     hub.broadcast('admin:issue-key', { keyId, peerId, keyType });
-    syncManager?.pushToPeers([fullEntry]);
+    syncBroadcast?.([fullEntry]);
 
     res.status(201).json({ keyId, key });
   }
@@ -123,7 +122,7 @@ export function createAdminHandlers(
     }
 
     hub.broadcast('admin:revoke', { peerId, keyType });
-    syncManager?.pushToPeers([fullEntry]);
+    syncBroadcast?.([fullEntry]);
 
     res.json({ success: true });
   }

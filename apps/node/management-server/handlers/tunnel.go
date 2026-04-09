@@ -26,11 +26,12 @@ type TunnelHandlers struct {
 }
 
 type activeTunnel struct {
-	id       uint64
-	listener net.Listener
-	peerID   peer.ID
-	host     string
-	port     uint16
+	id         uint64
+	listener   net.Listener
+	peerID     peer.ID
+	host       string
+	port       uint16
+	serviceKey string
 }
 
 // NewTunnelHandlers creates a new TunnelHandlers instance for managing TCP tunnels.
@@ -191,6 +192,8 @@ func (th *TunnelHandlers) acceptTunnelConnections(tunnel *activeTunnel, tunnelHa
 				done <- struct{}{}
 			}()
 			<-done
+			localConn.Close()
+			stream.Close()
 		}(conn)
 	}
 }
@@ -266,4 +269,121 @@ func (th *TunnelHandlers) HandleListTunnels(w http.ResponseWriter, r *http.Reque
 		"tunnels": tunnels,
 		"count":   len(tunnels),
 	})
+}
+
+// HandleOpenServiceTunnel handles the /tunnel/open-service endpoint to create a
+// service-key-routed TCP tunnel. Unlike HandleOpenTunnel which specifies host:port,
+// this endpoint sends a service key to the remote peer, which resolves it to a
+// backend URL via its local route table. The backend address remains opaque to the initiator.
+// POST /tunnel/open-service
+// Body: {"peer_id": "12D3...", "service_key": "abcd1234..."}
+// Returns: {"tunnel_id": 1, "local_port": 54321}
+func (th *TunnelHandlers) HandleOpenServiceTunnel(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !th.checkAuth(w, r) {
+		return
+	}
+
+	var req struct {
+		PeerID     string `json:"peer_id"`
+		ServiceKey string `json:"service_key"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	if req.PeerID == "" {
+		http.Error(w, "peer_id is required", http.StatusBadRequest)
+		return
+	}
+	if req.ServiceKey == "" {
+		http.Error(w, "service_key is required", http.StatusBadRequest)
+		return
+	}
+
+	peerID, err := peer.Decode(req.PeerID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Invalid peer_id: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	tunnelHandler := th.node.GetTunnelHandler()
+	if tunnelHandler == nil {
+		http.Error(w, "Tunnel handler not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create local listener: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	tunnelID := th.nextTunnelID.Add(1)
+	localAddr := listener.Addr().(*net.TCPAddr)
+
+	tunnel := &activeTunnel{
+		id:         tunnelID,
+		listener:   listener,
+		peerID:     peerID,
+		serviceKey: req.ServiceKey,
+	}
+	th.activeTunnels.Store(tunnelID, tunnel)
+
+	go th.acceptServiceTunnelConnections(tunnel, tunnelHandler)
+
+	log.Printf("Opened service tunnel %d: local port %d -> peer %s (key: %s)",
+		tunnelID, localAddr.Port, peerID.String(), req.ServiceKey[:16]+"...")
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"tunnel_id":   tunnelID,
+		"local_port":  localAddr.Port,
+		"peer_id":     peerID.String(),
+		"service_key": req.ServiceKey,
+	})
+}
+
+// acceptServiceTunnelConnections accepts connections on the local listener and
+// tunnels them using service-key routing to the remote peer.
+func (th *TunnelHandlers) acceptServiceTunnelConnections(tunnel *activeTunnel, tunnelHandler *tunnelPkg.Handler) {
+	defer tunnel.listener.Close()
+	defer th.activeTunnels.Delete(tunnel.id)
+
+	for {
+		conn, err := tunnel.listener.Accept()
+		if err != nil {
+			return
+		}
+
+		go func(localConn net.Conn) {
+			defer localConn.Close()
+
+			stream, err := tunnelHandler.OpenServiceTunnel(tunnel.peerID, tunnel.serviceKey)
+			if err != nil {
+				log.Printf("Failed to open service tunnel stream: %v", err)
+				return
+			}
+			defer stream.Close()
+
+			done := make(chan struct{}, 2)
+			go func() {
+				io.Copy(stream, localConn)
+				done <- struct{}{}
+			}()
+			go func() {
+				io.Copy(localConn, stream)
+				done <- struct{}{}
+			}()
+			<-done
+			localConn.Close()
+			stream.Close()
+		}(conn)
+	}
 }

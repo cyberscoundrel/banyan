@@ -15,6 +15,7 @@ pnpm-lock.yaml
 # Build output - we rebuild in container
 dist
 **/dist
+!apps/chat-frontend/dist
 build
 **/build
 .next

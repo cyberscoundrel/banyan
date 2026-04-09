@@ -1,44 +1,27 @@
-const API_BASE = '/api'
+const API_BASE = ''
 
 export interface Channel {
-  id: string
   name: string
   description?: string
+  createdAt: number
+  createdBy: string
 }
 
 export interface Message {
   id: string
-  channelId: string
+  channel: string
   author: string
   content: string
   timestamp: number
-}
-
-export interface ChallengeResponse {
-  challenge: string
-  expiresAt: number
-}
-
-export interface VerifyResponse {
-  peerId: string
-  token?: string
+  replyTo?: string
+  deleted: boolean
 }
 
 class ApiClient {
-  private token: string | null = null
-
-  setToken(token: string) {
-    this.token = token
-  }
-
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
-    }
-
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`
     }
 
     const response = await fetch(`${API_BASE}${path}`, {
@@ -54,43 +37,40 @@ class ApiClient {
     return response.json()
   }
 
-  async getChallenge(): Promise<ChallengeResponse> {
-    return this.request<ChallengeResponse>('/auth/challenge')
-  }
-
-  async verifyChallenge(challenge: string, signature: string): Promise<VerifyResponse> {
-    const response = await this.request<VerifyResponse & { token?: string }>('/auth/verify', {
-      method: 'POST',
-      body: JSON.stringify({ challenge, signature }),
-    })
-    if (response.token) {
-      this.token = response.token
-    }
-    return response
-  }
-
   async getChannels(): Promise<Channel[]> {
-    return this.request<Channel[]>('/channels')
+    const data = await this.request<{ channels: Channel[] }>('/ledger/channels')
+    return data.channels ?? []
   }
 
-  async getPosts(channelId: string, limit = 50, before?: string): Promise<Message[]> {
-    const params = new URLSearchParams({ limit: String(limit) })
-    if (before) params.set('before', before)
-    return this.request<Message[]>(`/posts?channelId=${channelId}&${params}`)
-  }
-
-  async createPost(channelId: string, content: string): Promise<Message> {
-    return this.request<Message>('/ledger/post', {
+  async createChannel(name: string, description?: string): Promise<{ channel: Channel }> {
+    return this.request<{ channel: Channel }>('/ledger/channels', {
       method: 'POST',
-      body: JSON.stringify({ channelId, content }),
+      body: JSON.stringify({ name, description }),
     })
   }
 
-  async deletePost(postId: string, reason?: string): Promise<void> {
+  async getPosts(channel: string, limit = 50): Promise<Message[]> {
+    const params = new URLSearchParams({ channel, limit: String(limit) })
+    const data = await this.request<{ posts: Message[] }>(`/ledger/posts?${params}`)
+    return data.posts ?? []
+  }
+
+  async createPost(channel: string, content: string): Promise<{ entry: any }> {
+    return this.request<{ entry: any }>('/ledger/post', {
+      method: 'POST',
+      body: JSON.stringify({ channel, content }),
+    })
+  }
+
+  async deletePost(postId: string): Promise<void> {
     await this.request('/ledger/delete', {
       method: 'POST',
-      body: JSON.stringify({ targetId: postId, reason }),
+      body: JSON.stringify({ postId }),
     })
+  }
+
+  async getPeerInfo(): Promise<{ peerId: string }> {
+    return this.request<{ peerId: string }>('/peer-info')
   }
 }
 

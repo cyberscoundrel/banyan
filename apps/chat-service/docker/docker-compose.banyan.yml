@@ -1,0 +1,204 @@
+version: "3.8"
+
+x-service-node: &service-node
+  image: banyan-node:latest
+  restart: unless-stopped
+  networks:
+    - banyan-net
+
+x-proxy-command: &proxy-command
+  - "-privkey=/app/node-identity.pem"
+  - "-addons-dir=/app/addons"
+  - "-figs-dir=/app/figs"
+  - "-no-crypto"
+  - "-allow-expired-figs"
+  - "-allow-insecure-figs"
+  - "-tunnel-enabled"
+  - "-override-transport-restrictions"
+
+services:
+  static-1:
+    <<: *service-node
+    container_name: chat-static-1
+    hostname: static-1
+    ports:
+      - "9001:9001"
+    volumes:
+      - ../topology/output/nodes/chat-static-1/node-identity.pem:/app/node-identity.pem:ro
+      - ../topology/output/nodes/chat-static-1/services:/app/services:ro
+      - ../topology/output/nodes/chat-static-1/addons:/app/addons:ro
+      - ../topology/output/nodes/chat-static-1/figs:/app/figs:ro
+    command:
+      - "-privkey=/app/node-identity.pem"
+      - "-services-dir=/app/services"
+      - "-addons-dir=/app/addons"
+      - "-figs-dir=/app/figs"
+      - "-listen=/ip4/0.0.0.0/tcp/9001"
+      - "-no-crypto"
+      - "-allow-expired-figs"
+      - "-allow-insecure-figs"
+      - "-tunnel-enabled"
+      - "-override-transport-restrictions"
+
+  static-2:
+    <<: *service-node
+    container_name: chat-static-2
+    hostname: static-2
+    ports:
+      - "9002:9002"
+    volumes:
+      - ../topology/output/nodes/chat-static-2/node-identity.pem:/app/node-identity.pem:ro
+      - ../topology/output/nodes/chat-static-2/services:/app/services:ro
+      - ../topology/output/nodes/chat-static-2/addons:/app/addons:ro
+      - ../topology/output/nodes/chat-static-2/figs:/app/figs:ro
+    command:
+      - "-privkey=/app/node-identity.pem"
+      - "-services-dir=/app/services"
+      - "-addons-dir=/app/addons"
+      - "-figs-dir=/app/figs"
+      - "-listen=/ip4/0.0.0.0/tcp/9002"
+      - "-no-crypto"
+      - "-allow-expired-figs"
+      - "-allow-insecure-figs"
+      - "-tunnel-enabled"
+      - "-override-transport-restrictions"
+
+  ledger-1:
+    <<: *service-node
+    container_name: chat-ledger-1
+    hostname: ledger-1
+    ports:
+      - "9003:9003"
+    volumes:
+      - ../topology/output/nodes/chat-ledger-1/node-identity.pem:/app/node-identity.pem:ro
+      - ../topology/output/nodes/chat-ledger-1/services:/app/services:ro
+      - ../topology/output/nodes/chat-ledger-1/addons:/app/addons:ro
+      - ../topology/output/nodes/chat-ledger-1/figs:/app/figs:ro
+    command:
+      - "-privkey=/app/node-identity.pem"
+      - "-services-dir=/app/services"
+      - "-addons-dir=/app/addons"
+      - "-figs-dir=/app/figs"
+      - "-listen=/ip4/0.0.0.0/tcp/9003"
+      - "-no-crypto"
+      - "-allow-expired-figs"
+      - "-allow-insecure-figs"
+      - "-tunnel-enabled"
+      - "-override-transport-restrictions"
+
+  ledger-2:
+    <<: *service-node
+    container_name: chat-ledger-2
+    hostname: ledger-2
+    ports:
+      - "9004:9004"
+    volumes:
+      - ../topology/output/nodes/chat-ledger-2/node-identity.pem:/app/node-identity.pem:ro
+      - ../topology/output/nodes/chat-ledger-2/services:/app/services:ro
+      - ../topology/output/nodes/chat-ledger-2/addons:/app/addons:ro
+      - ../topology/output/nodes/chat-ledger-2/figs:/app/figs:ro
+    command:
+      - "-privkey=/app/node-identity.pem"
+      - "-services-dir=/app/services"
+      - "-addons-dir=/app/addons"
+      - "-figs-dir=/app/figs"
+      - "-listen=/ip4/0.0.0.0/tcp/9004"
+      - "-no-crypto"
+      - "-allow-expired-figs"
+      - "-allow-insecure-figs"
+      - "-tunnel-enabled"
+      - "-override-transport-restrictions"
+
+  mod-1:
+    <<: *service-node
+    container_name: chat-mod-1
+    hostname: mod-1
+    ports:
+      - "9005:9005"
+    volumes:
+      - ../topology/output/nodes/chat-mod-1/node-identity.pem:/app/node-identity.pem:ro
+      - ../topology/output/nodes/chat-mod-1/services:/app/services:ro
+      - ../topology/output/nodes/chat-mod-1/addons:/app/addons:ro
+      - ../topology/output/nodes/chat-mod-1/figs:/app/figs:ro
+    command:
+      - "-privkey=/app/node-identity.pem"
+      - "-services-dir=/app/services"
+      - "-addons-dir=/app/addons"
+      - "-figs-dir=/app/figs"
+      - "-listen=/ip4/0.0.0.0/tcp/9005"
+      - "-no-crypto"
+      - "-allow-expired-figs"
+      - "-allow-insecure-figs"
+      - "-tunnel-enabled"
+      - "-override-transport-restrictions"
+
+  admin-1:
+    <<: *service-node
+    container_name: chat-admin-1
+    hostname: admin-1
+    ports:
+      - "9006:9006"
+    volumes:
+      - ../topology/output/nodes/chat-admin-1/node-identity.pem:/app/node-identity.pem:ro
+      - ../topology/output/nodes/chat-admin-1/services:/app/services:ro
+      - ../topology/output/nodes/chat-admin-1/addons:/app/addons:ro
+      - ../topology/output/nodes/chat-admin-1/figs:/app/figs:ro
+    command:
+      - "-privkey=/app/node-identity.pem"
+      - "-services-dir=/app/services"
+      - "-addons-dir=/app/addons"
+      - "-figs-dir=/app/figs"
+      - "-listen=/ip4/0.0.0.0/tcp/9006"
+      - "-no-crypto"
+      - "-allow-expired-figs"
+      - "-allow-insecure-figs"
+      - "-tunnel-enabled"
+      - "-override-transport-restrictions"
+
+  proxy-1:
+    <<: *service-node
+    container_name: chat-proxy-1
+    hostname: proxy-1
+    ports:
+      - "9007:9007"
+      - "9090:9090"
+    volumes:
+      - ../topology/output/nodes/chat-proxy-1/node-identity.pem:/app/node-identity.pem:ro
+      - ../topology/output/nodes/chat-proxy-1/addons:/app/addons:ro
+      - ../topology/output/nodes/chat-proxy-1/figs:/app/figs:ro
+    command:
+      - "-privkey=/app/node-identity.pem"
+      - "-addons-dir=/app/addons"
+      - "-figs-dir=/app/figs"
+      - "-listen=/ip4/0.0.0.0/tcp/9007"
+      - "-no-crypto"
+      - "-allow-expired-figs"
+      - "-allow-insecure-figs"
+      - "-tunnel-enabled"
+      - "-override-transport-restrictions"
+
+  proxy-2:
+    <<: *service-node
+    container_name: chat-proxy-2
+    hostname: proxy-2
+    ports:
+      - "9008:9008"
+      - "9091:9091"
+    volumes:
+      - ../topology/output/nodes/chat-proxy-2/node-identity.pem:/app/node-identity.pem:ro
+      - ../topology/output/nodes/chat-proxy-2/addons:/app/addons:ro
+      - ../topology/output/nodes/chat-proxy-2/figs:/app/figs:ro
+    command:
+      - "-privkey=/app/node-identity.pem"
+      - "-addons-dir=/app/addons"
+      - "-figs-dir=/app/figs"
+      - "-listen=/ip4/0.0.0.0/tcp/9008"
+      - "-no-crypto"
+      - "-allow-expired-figs"
+      - "-allow-insecure-figs"
+      - "-tunnel-enabled"
+      - "-override-transport-restrictions"
+
+networks:
+  banyan-net:
+    driver: bridge

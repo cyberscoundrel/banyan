@@ -1,0 +1,37 @@
+FROM golang:1.24-alpine AS go-builder
+
+WORKDIR /build
+
+COPY apps/node/go.mod apps/node/go.sum ./
+RUN go mod download
+
+COPY apps/node/ .
+
+RUN go mod tidy && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /build/banyan . && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /build/proxy-addon ./addon/proxy
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates nodejs npm python3 make g++ sqlite
+
+WORKDIR /app/chat-service
+
+COPY apps/chat-service/package.json ./
+RUN npm install
+
+COPY apps/chat-service/src ./src
+COPY apps/chat-service/tsconfig.json ./
+RUN npx tsc && rm -rf node_modules && npm install --omit=dev
+
+RUN mkdir -p /app/data
+
+COPY apps/chat-frontend/dist /app/chat-service/frontend/dist
+
+COPY --from=go-builder /build/banyan /usr/local/bin/banyan
+COPY --from=go-builder /build/proxy-addon /usr/local/bin/proxy-addon
+
+COPY apps/chat-service/docker/banyan-entrypoint.sh /usr/local/bin/banyan-entrypoint.sh
+RUN chmod +x /usr/local/bin/banyan-entrypoint.sh
+
+ENTRYPOINT ["banyan-entrypoint.sh"]

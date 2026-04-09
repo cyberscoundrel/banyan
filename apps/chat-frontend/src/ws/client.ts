@@ -2,8 +2,9 @@ type EventHandler = (event: WsEvent) => void
 type ConnectionHandler = () => void
 
 export interface WsEvent {
-  type: 'new_post' | 'delete_post' | 'channel_update' | 'user_join' | 'user_leave'
+  event: string
   data: Record<string, unknown>
+  timestamp?: number
 }
 
 class WebSocketClient {
@@ -17,13 +18,14 @@ class WebSocketClient {
 
   connect() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/events`
+    const wsUrl = `${protocol}//${window.location.host}/ledger/events`
 
     try {
       this.ws = new WebSocket(wsUrl)
       this.ws.onopen = () => {
         console.log('WebSocket connected')
         this.reconnectAttempts = 0
+        this.subscribe(['channel:new', 'post:new', 'post:delete', 'sync:entry'])
         this.connectHandlers.forEach((h) => h())
       }
       this.ws.onclose = () => {
@@ -45,6 +47,12 @@ class WebSocketClient {
     } catch (err) {
       console.error('Failed to create WebSocket:', err)
       this.attemptReconnect()
+    }
+  }
+
+  private subscribe(events: string[]) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'subscribe', events }))
     }
   }
 
@@ -76,12 +84,6 @@ class WebSocketClient {
 
   onDisconnect(handler: ConnectionHandler) {
     this.disconnectHandlers.push(handler)
-  }
-
-  send(data: unknown) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(data))
-    }
   }
 }
 

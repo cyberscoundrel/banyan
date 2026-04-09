@@ -472,6 +472,98 @@ func (sh *ServiceHandlers) HandleFind(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Started service locator for service key: %s", serviceKeyHash)
 }
 
+// HandleAliasResolve handles the /services/alias/resolve endpoint to resolve a
+// service alias to a connected peer ID and service key. This is used by the proxy
+// addon to open service-key-routed tunnels without exposing the backend routing table.
+// GET /services/alias/resolve?alias=chat-fig
+// Returns: {"peer_id": "12D3...", "service_key": "abcd1234..."}
+func (sh *ServiceHandlers) HandleAliasResolve(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if sh.node == nil {
+		http.Error(w, "Node not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	alias := strings.TrimSpace(r.URL.Query().Get("alias"))
+	if alias == "" {
+		http.Error(w, "alias query parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	serviceKeys, ok := GetServiceKeysForAlias(alias, "")
+	if !ok || len(serviceKeys) == 0 {
+		http.Error(w, fmt.Sprintf("alias '%s' not found. Call /services/find first.", alias), http.StatusNotFound)
+		return
+	}
+
+	if requestPath := r.URL.Query().Get("path"); requestPath != "" {
+		if figData, hasFig := GetFigDataForAlias(alias, ""); hasFig {
+			matchedKeys, _ := figData.FindKeysAndMatchedPath(requestPath)
+			if len(matchedKeys) > 0 {
+				serviceKeys = matchedKeys
+			}
+		}
+	}
+
+	returnAll := r.URL.Query().Get("all") == "true"
+
+	connections := sh.node.GetConnectionManager().GetConnectionsCopy()
+	if returnAll {
+		type peerInfo struct {
+			PeerID     string `json:"peer_id"`
+			ServiceKey string `json:"service_key"`
+		}
+		var found []peerInfo
+		seen := make(map[string]bool)
+		for _, keyHex := range serviceKeys {
+			keyLower := strings.ToLower(strings.TrimSpace(keyHex))
+			for pid, conn := range connections {
+				pidStr := pid.String()
+				if seen[pidStr] {
+					continue
+				}
+				for _, svcKey := range conn.ServiceKeys {
+					if strings.ToLower(fmt.Sprintf("%x", svcKey)) == keyLower {
+						found = append(found, peerInfo{PeerID: pidStr, ServiceKey: keyHex})
+						seen[pidStr] = true
+						break
+					}
+				}
+			}
+		}
+		if len(found) == 0 {
+			http.Error(w, fmt.Sprintf("alias '%s' resolved but no connected peers found", alias), http.StatusBadGateway)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"peers": found,
+		})
+		return
+	}
+
+	for _, keyHex := range serviceKeys {
+		keyLower := strings.ToLower(strings.TrimSpace(keyHex))
+		for pid, conn := range connections {
+			for _, svcKey := range conn.ServiceKeys {
+				if strings.ToLower(fmt.Sprintf("%x", svcKey)) == keyLower {
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(map[string]interface{}{
+						"peer_id":     pid.String(),
+						"service_key": keyHex,
+					})
+					return
+				}
+			}
+		}
+	}
+
+	http.Error(w, fmt.Sprintf("alias '%s' resolved but no connected peers found for its service keys", alias), http.StatusBadGateway)
+}
+
 // HandleLocatorStart handles the /services/locator/start endpoint to start
 // a service locator for discovering peers that announce a specific service key.
 func (sh *ServiceHandlers) HandleLocatorStart(w http.ResponseWriter, r *http.Request) {

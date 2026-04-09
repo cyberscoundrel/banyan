@@ -935,6 +935,12 @@ func (h *Handler) HandleLibp2pHTTPProxy(w http.ResponseWriter, r *http.Request) 
 		proxyReq.Header[k] = v
 	}
 
+	// Inject the requesting peer's identity so downstream services can
+	// authenticate the caller via the P2P network.
+	if peerID := h.inferPeerIDFromRequest(r); peerID != "" {
+		proxyReq.Header.Set("X-Peer-Id", peerID)
+	}
+
 	// Make the request using our transport
 	client := &http.Client{Transport: h.httpTransport}
 	resp, err := client.Do(proxyReq)
@@ -958,12 +964,6 @@ func (h *Handler) HandleLibp2pHTTPProxy(w http.ResponseWriter, r *http.Request) 
 			"error":   err.Error(),
 		})
 	}
-
-	h.sendEvent(types.EventProxyRequest, map[string]interface{}{
-		"target": targetURL,
-		"method": r.Method,
-		"status": resp.StatusCode,
-	})
 }
 
 // HandleRouter forwards HTTP requests to configured backend URLs based on route identifiers.
@@ -1051,6 +1051,12 @@ func (h *Handler) HandleRouter(w http.ResponseWriter, r *http.Request) {
 	// Copy headers
 	for k, v := range r.Header {
 		proxyReq.Header[k] = v
+	}
+
+	// Inject the requesting peer's identity so downstream services can
+	// authenticate the caller via the P2P network.
+	if peerID := h.inferPeerIDFromRequest(r); peerID != "" {
+		proxyReq.Header.Set("X-Peer-Id", peerID)
 	}
 
 	// Make the request using our transport

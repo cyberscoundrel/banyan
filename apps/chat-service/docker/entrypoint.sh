@@ -27,12 +27,7 @@ echo "Data directory: /app/data"
 
 generate_identity
 
-if [ -n "$SYNC_PEERS" ]; then
-    export EXTRA_ARGS="$EXTRA_ARGS -sync-peers=$SYNC_PEERS"
-fi
-
 exec node /app/dist/index.js \
     --listen="${LISTEN_ADDR:-:8080}" \
     --data-dir=/app/data \
-    ${EXTRA_ARGS:+$EXTRA_ARGS} \
     "$@"

@@ -1,8 +1,6 @@
 import { loadConfig, Config } from './config.js';
 import { createApp } from './server.js';
-import { SyncManager } from './ledger/index.js';
-
-let syncManager: SyncManager | null = null;
+import { loadSigningKey } from './ledger/signing.js';
 
 async function main() {
   const config = loadConfig();
@@ -13,13 +11,20 @@ async function main() {
   console.log(`Data dir: ${config.dataDir}`);
   console.log(`Keys: static=${config.hasStaticKey}, ledger=${config.hasLedgerKey}, mod=${config.hasModKey}, admin=${config.hasAdminKey}`);
 
-  const { server, hub, storage } = createApp(config);
-
-  if (config.syncEnabled && config.syncPeers.length > 0) {
-    console.log(`Sync peers: ${config.syncPeers.join(', ')}`);
-    syncManager = new SyncManager(storage, config.syncPeers, config.syncInterval);
-    syncManager.start();
+  if (config.serviceKeyPem) {
+    try {
+      const { publicKeyHex } = loadSigningKey(config.serviceKeyPem);
+      console.log(`Loaded service key: ${publicKeyHex.slice(0, 16)}...`);
+    } catch (err) {
+      console.error(`Failed to load service key: ${err}`);
+    }
   }
+
+  if (config.proxyUrl && config.figAlias) {
+    console.log(`Sync via proxy: ${config.proxyUrl} (fig alias: ${config.figAlias})`);
+  }
+
+  const { server, hub, storage } = createApp(config);
 
   const [host, port] = parseAddr(config.listenAddr);
   
@@ -29,7 +34,6 @@ async function main() {
 
   const shutdown = () => {
     console.log('\nShutting down...');
-    syncManager?.stop();
     hub.close();
     storage.close();
     server.close(() => {

@@ -1,5 +1,4 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import { Server } from 'http';
 
 type EventHandler = (data: any) => void;
 
@@ -10,10 +9,13 @@ interface Client {
 
 export class WebSocketHub {
   private clients: Set<Client> = new Set();
-  private wss: WebSocketServer;
+  wss: WebSocketServer;
 
-  constructor(server: Server) {
-    this.wss = new WebSocketServer({ server });
+  constructor() {
+    this.wss = new WebSocketServer({ noServer: true });
+  }
+
+  attach(server: import('http').Server): void {
     this.wss.on('connection', (ws) => {
       const client: Client = { ws, subscriptions: new Set() };
       this.clients.add(client);

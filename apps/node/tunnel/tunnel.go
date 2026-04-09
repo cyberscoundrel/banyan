@@ -12,11 +12,15 @@
 package tunnel
 
 import (
+	"bufio"
 	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"net/url"
+	"strconv"
 	"sync"
 	"time"
 
@@ -28,6 +32,11 @@ import (
 
 // ProtocolID is the libp2p protocol identifier for TCP tunneling.
 const ProtocolID = protocol.ID("/banyan/tcp-tunnel/1.0.0")
+
+// ServiceProtocolID is the libp2p protocol identifier for service-key-routed tunneling.
+// Instead of specifying host:port, the initiator sends a service key and the
+// receiver resolves it to a backend URL via its local route table.
+const ServiceProtocolID = protocol.ID("/banyan/service-tunnel/1.0.0")
 
 // TunnelRequest represents a request to establish a tunnel to a target host and port.
 type TunnelRequest struct {
@@ -47,7 +56,8 @@ type TunnelResponse struct {
 type Handler struct {
 	host           host.Host
 	ctx            context.Context
-	allowedTargets []string // List of allowed target patterns (empty = allow all local)
+	allowedTargets []string
+	routeLookup    func(string) (string, bool)
 	logf           func(format string, v ...interface{})
 	mu             sync.RWMutex
 }
@@ -65,7 +75,17 @@ func NewHandler(h host.Host, ctx context.Context, logf func(format string, v ...
 		logf: logf,
 	}
 	h.SetStreamHandler(ProtocolID, handler.handleIncomingStream)
+	h.SetStreamHandler(ServiceProtocolID, handler.handleIncomingServiceStream)
 	return handler
+}
+
+// SetRouteLookup sets a callback that resolves service key identifiers to
+// backend URLs. When set, the service tunnel protocol uses this to route
+// incoming service-key-based tunnel requests to the correct backend.
+func (h *Handler) SetRouteLookup(fn func(string) (string, bool)) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.routeLookup = fn
 }
 
 // SetAllowedTargets configures the list of allowed target hosts for incoming
@@ -257,4 +277,183 @@ func (h *Handler) OpenTunnel(peerID peer.ID, targetHost string, targetPort uint1
 
 	h.logf("Tunnel opened to %s via peer %s", fmt.Sprintf("%s:%d", targetHost, targetPort), peerID)
 	return s, nil
+}
+
+// handleIncomingServiceStream handles an incoming service-key-routed tunnel request.
+// The request contains a service key identifier; the handler looks up the corresponding
+// backend URL from its route table, extracts the host:port, and establishes a TCP connection.
+func (h *Handler) handleIncomingServiceStream(s network.Stream) {
+	defer s.Close()
+
+	h.logf("Incoming service tunnel request from %s", s.Conn().RemotePeer())
+
+	var reqLen uint32
+	if err := binary.Read(s, binary.BigEndian, &reqLen); err != nil {
+		h.logf("Failed to read service tunnel request length: %v", err)
+		h.writeResponse(s, false, "failed to read request")
+		return
+	}
+	if reqLen > 4096 {
+		h.writeResponse(s, false, "request too large")
+		return
+	}
+
+	reqBuf := make([]byte, reqLen)
+	if _, err := io.ReadFull(s, reqBuf); err != nil {
+		h.logf("Failed to read service tunnel request: %v", err)
+		h.writeResponse(s, false, "failed to read request")
+		return
+	}
+
+	serviceKey := string(reqBuf)
+	if serviceKey == "" {
+		h.writeResponse(s, false, "empty service key")
+		return
+	}
+
+	h.logf("Service tunnel request: key=%s", serviceKey)
+
+	h.mu.RLock()
+	lookup := h.routeLookup
+	h.mu.RUnlock()
+
+	if lookup == nil {
+		h.writeResponse(s, false, "no route lookup configured")
+		return
+	}
+
+	routeURL, found := lookup(serviceKey)
+	if !found {
+		h.writeResponse(s, false, fmt.Sprintf("no route for service key: %s", serviceKey))
+		return
+	}
+
+	parsed, err := url.Parse(routeURL)
+	if err != nil {
+		h.writeResponse(s, false, fmt.Sprintf("invalid route URL: %v", err))
+		return
+	}
+
+	targetHost := parsed.Hostname()
+	targetPortStr := parsed.Port()
+	if targetPortStr == "" {
+		if parsed.Scheme == "https" {
+			targetPortStr = "443"
+		} else {
+			targetPortStr = "80"
+		}
+	}
+	targetPort, err := strconv.Atoi(targetPortStr)
+	if err != nil {
+		h.writeResponse(s, false, fmt.Sprintf("invalid port in route URL: %v", err))
+		return
+	}
+
+	targetAddr := fmt.Sprintf("%s:%d", targetHost, targetPort)
+	h.logf("Service tunnel routing key=%s to %s", serviceKey, targetAddr)
+
+	if !h.isAllowedTarget(targetHost) {
+		h.writeResponse(s, false, "target not allowed")
+		return
+	}
+
+	conn, err := net.DialTimeout("tcp", targetAddr, 10*time.Second)
+	if err != nil {
+		h.writeResponse(s, false, fmt.Sprintf("failed to connect: %v", err))
+		return
+	}
+	defer conn.Close()
+
+	if err := h.writeResponse(s, true, ""); err != nil {
+		h.logf("Failed to write service tunnel response: %v", err)
+		return
+	}
+
+	h.logf("Service tunnel established: key=%s -> %s", serviceKey, targetAddr)
+
+	remotePeerID := s.Conn().RemotePeer().String()
+	h.relayWithPeerID(s, conn, remotePeerID)
+	h.logf("Service tunnel closed: key=%s", serviceKey)
+}
+
+// OpenServiceTunnel establishes a service-key-routed tunnel to a remote peer.
+// The remote peer resolves the service key to a backend URL via its route table
+// and connects to it, keeping the backend address opaque to the initiator.
+func (h *Handler) OpenServiceTunnel(peerID peer.ID, serviceKey string) (network.Stream, error) {
+	s, err := h.host.NewStream(h.ctx, peerID, ServiceProtocolID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open service tunnel stream: %w", err)
+	}
+
+	reqBuf := []byte(serviceKey)
+	if err := binary.Write(s, binary.BigEndian, uint32(len(reqBuf))); err != nil {
+		s.Close()
+		return nil, fmt.Errorf("failed to write service key length: %w", err)
+	}
+	if _, err := s.Write(reqBuf); err != nil {
+		s.Close()
+		return nil, fmt.Errorf("failed to write service key: %w", err)
+	}
+
+	respBuf := make([]byte, 1)
+	if _, err := io.ReadFull(s, respBuf); err != nil {
+		s.Close()
+		return nil, fmt.Errorf("failed to read service tunnel response: %w", err)
+	}
+
+	if respBuf[0] == 0 {
+		var errLen uint16
+		if err := binary.Read(s, binary.BigEndian, &errLen); err != nil {
+			s.Close()
+			return nil, fmt.Errorf("service tunnel request failed (couldn't read error)")
+		}
+		errBuf := make([]byte, errLen)
+		if _, err := io.ReadFull(s, errBuf); err != nil {
+			s.Close()
+			return nil, fmt.Errorf("service tunnel request failed (couldn't read error message)")
+		}
+		s.Close()
+		return nil, fmt.Errorf("service tunnel request failed: %s", string(errBuf))
+	}
+
+	h.logf("Service tunnel opened for key=%s via peer %s", serviceKey, peerID)
+	return s, nil
+}
+
+// relayWithPeerID reads the first HTTP request from the libp2p stream, injects an
+// X-Peer-Id header identifying the remote P2P peer, writes the modified request to
+// the backend connection, then falls back to a raw bidirectional relay for the
+// remainder of the stream (e.g. WebSocket frames, keep-alive requests).
+func (h *Handler) relayWithPeerID(s network.Stream, conn net.Conn, peerID string) {
+	br := bufio.NewReader(s)
+
+	req, err := http.ReadRequest(br)
+	if err != nil {
+		h.logf("Failed to read initial HTTP request from tunnel: %v", err)
+		io.Copy(conn, s)
+		return
+	}
+
+	req.Header.Set("X-Peer-Id", peerID)
+
+	if err := req.Write(conn); err != nil {
+		h.logf("Failed to write modified request to backend: %v", err)
+		return
+	}
+
+	remaining := br.Buffered()
+	if remaining > 0 {
+		leftover := make([]byte, remaining)
+		n, _ := br.Read(leftover)
+		if n > 0 {
+			conn.Write(leftover[:n])
+		}
+	}
+
+	done := make(chan struct{}, 2)
+	go func() { io.Copy(conn, s); done <- struct{}{} }()
+	go func() { io.Copy(s, conn); done <- struct{}{} }()
+	<-done
+	conn.Close()
+	s.Close()
 }

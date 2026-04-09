@@ -9,23 +9,10 @@ export interface Config {
   hasLedgerKey: boolean;
   hasModKey: boolean;
   hasAdminKey: boolean;
-  syncPeers: string[];
   syncEnabled: boolean;
-  syncInterval: number;
-}
-
-function parseDuration(s: string): number {
-  const match = s.match(/^(\d+)(ms|s|m|h)$/);
-  if (!match) return parseInt(s) || 30000;
-  const [, val, unit] = match;
-  const ms = parseInt(val);
-  switch (unit) {
-    case 'ms': return ms;
-    case 's': return ms * 1000;
-    case 'm': return ms * 60000;
-    case 'h': return ms * 3600000;
-    default: return ms;
-  }
+  serviceKeyPem: string;
+  proxyUrl: string;
+  figAlias: string;
 }
 
 export function loadConfig(): Config {
@@ -43,10 +30,6 @@ export function loadConfig(): Config {
     return def;
   };
 
-  const syncInterval = fileConfig.syncInterval 
-    ? parseDuration(String(fileConfig.syncInterval))
-    : 30000;
-
   return {
     listenAddr: process.env.LISTEN_ADDR || fileConfig.listenAddr || ':8080',
     dataDir: process.env.DATA_DIR || fileConfig.dataDir || './data',
@@ -55,10 +38,9 @@ export function loadConfig(): Config {
     hasLedgerKey: getBool('HAS_LEDGER_KEY', fileConfig.hasLedgerKey ?? false),
     hasModKey: getBool('HAS_MOD_KEY', fileConfig.hasModKey ?? false),
     hasAdminKey: getBool('HAS_ADMIN_KEY', fileConfig.hasAdminKey ?? false),
-    syncPeers: process.env.SYNC_PEERS 
-      ? process.env.SYNC_PEERS.split(',').filter(Boolean)
-      : fileConfig.syncPeers || [],
     syncEnabled: getBool('SYNC_ENABLED', fileConfig.syncEnabled ?? true),
-    syncInterval,
+    serviceKeyPem: process.env.SERVICE_KEY_PEM || fileConfig.serviceKeyPem || '',
+    proxyUrl: process.env.PROXY_URL || fileConfig.proxyUrl || 'http://127.0.0.1:9090',
+    figAlias: process.env.FIG_ALIAS || fileConfig.figAlias || '',
   };
 }
