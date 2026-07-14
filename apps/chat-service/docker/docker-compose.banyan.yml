@@ -1,34 +1,88 @@
 version: "3.8"
 
+# Each banyan service node is paired with a Gluetun WireGuard sidecar that
+# tunnels all of its egress traffic through Mullvad VPN. Every container gets
+# a distinct public-looking egress IP from a different Mullvad relay, while
+# preserving consumer-grade NAT (no inbound public-internet ports) — matching
+# the network conditions real residential / mobile users have.
+#
+# Required env vars per node (see ./.env, populated by
+# test-utils/mullvad/provision-mullvad.sh):
+#   MULLVAD_PRIVKEY_<NAME>      - WireGuard private key (base64)
+#   MULLVAD_ADDR_<NAME>         - tunnel address (e.g. 10.66.x.y/32)
+#   MULLVAD_HOSTNAME_<NAME>     - pinned relay hostname (e.g. us-nyc-wg-001)
+#
+# Each banyan node lives in its sidecar's network namespace via
+# `network_mode: "service:vpn-<name>"` — it has no IP of its own and all
+# traffic (including the libp2p listener) flows through the WireGuard tunnel.
+# Host-side libp2p ports are published on the *sidecar*, since the banyan
+# container no longer owns its own networking stack.
+
+x-gluetun: &gluetun
+  image: qmcgaw/gluetun:latest
+  cap_add:
+    - NET_ADMIN
+  devices:
+    - /dev/net/tun:/dev/net/tun
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "wget", "--tries=1", "--timeout=5", "-qO-", "http://ifconfig.me/ip"]
+    interval: 15s
+    timeout: 8s
+    retries: 5
+    start_period: 30s
+
+x-gluetun-env: &gluetun-env
+  VPN_SERVICE_PROVIDER: mullvad
+  VPN_TYPE: wireguard
+  HEALTH_VPN_DURATION_INITIAL: 30s
+  # Mullvad filters ICMP "fragmentation needed", so Path-MTU discovery is
+  # blackholed: short HTTP requests work but libp2p's larger handshake packets
+  # (1281-1380B) get silently dropped and every dial stalls to timeout. Pin a
+  # conservative tunnel MTU so nothing exceeds the real path MTU.
+  WIREGUARD_MTU: 1280
+  # Disable Gluetun's built-in DoT resolver (Cloudflare DoT can't always be
+  # reached through Mullvad relays). Use Mullvad's plain-DNS resolver at
+  # 10.64.0.1 inside the WireGuard tunnel.
+  DOT: "off"
+  DNS_ADDRESS: 10.64.0.1
+  # Disable the DNS leak check / blocklist downloads, which try to reach
+  # github.com over a still-converging tunnel and just spam warnings.
+  BLOCK_MALICIOUS: "off"
+  BLOCK_SURVEILLANCE: "off"
+  BLOCK_ADS: "off"
+
 x-service-node: &service-node
   image: banyan-node:latest
   restart: unless-stopped
-  networks:
-    - banyan-net
-
-x-proxy-command: &proxy-command
-  - "-privkey=/app/node-identity.pem"
-  - "-addons-dir=/app/addons"
-  - "-figs-dir=/app/figs"
-  - "-no-crypto"
-  - "-allow-expired-figs"
-  - "-allow-insecure-figs"
-  - "-tunnel-enabled"
-  - "-override-transport-restrictions"
 
 services:
+  vpn-static-1:
+    <<: *gluetun
+    container_name: vpn-static-1
+    networks: [net-static-1]
+    environment:
+      <<: *gluetun-env
+      WIREGUARD_PRIVATE_KEY: ${MULLVAD_PRIVKEY_STATIC_1}
+      WIREGUARD_ADDRESSES: ${MULLVAD_ADDR_STATIC_1}
+      SERVER_HOSTNAMES: ${MULLVAD_HOSTNAME_STATIC_1}
+    ports:
+      - "9001:9001"
   static-1:
     <<: *service-node
     container_name: chat-static-1
-    hostname: static-1
-    ports:
-      - "9001:9001"
+    network_mode: "service:vpn-static-1"
+    depends_on:
+      vpn-static-1:
+        condition: service_healthy
     volumes:
       - ../topology/output/nodes/chat-static-1/node-identity.pem:/app/node-identity.pem:ro
       - ../topology/output/nodes/chat-static-1/services:/app/services:ro
       - ../topology/output/nodes/chat-static-1/addons:/app/addons:ro
       - ../topology/output/nodes/chat-static-1/figs:/app/figs:ro
+      - ./node-bootstrap.json:/app/node-bootstrap.json:ro
     command:
+      - "-config=/app/node-bootstrap.json"
       - "-privkey=/app/node-identity.pem"
       - "-services-dir=/app/services"
       - "-addons-dir=/app/addons"
@@ -39,42 +93,34 @@ services:
       - "-allow-insecure-figs"
       - "-tunnel-enabled"
       - "-override-transport-restrictions"
+      - "-nat-traversal"
 
-  static-2:
-    <<: *service-node
-    container_name: chat-static-2
-    hostname: static-2
+  vpn-ledger-1:
+    <<: *gluetun
+    container_name: vpn-ledger-1
+    networks: [net-ledger-1]
+    environment:
+      <<: *gluetun-env
+      WIREGUARD_PRIVATE_KEY: ${MULLVAD_PRIVKEY_LEDGER_1}
+      WIREGUARD_ADDRESSES: ${MULLVAD_ADDR_LEDGER_1}
+      SERVER_HOSTNAMES: ${MULLVAD_HOSTNAME_LEDGER_1}
     ports:
-      - "9002:9002"
-    volumes:
-      - ../topology/output/nodes/chat-static-2/node-identity.pem:/app/node-identity.pem:ro
-      - ../topology/output/nodes/chat-static-2/services:/app/services:ro
-      - ../topology/output/nodes/chat-static-2/addons:/app/addons:ro
-      - ../topology/output/nodes/chat-static-2/figs:/app/figs:ro
-    command:
-      - "-privkey=/app/node-identity.pem"
-      - "-services-dir=/app/services"
-      - "-addons-dir=/app/addons"
-      - "-figs-dir=/app/figs"
-      - "-listen=/ip4/0.0.0.0/tcp/9002"
-      - "-no-crypto"
-      - "-allow-expired-figs"
-      - "-allow-insecure-figs"
-      - "-tunnel-enabled"
-      - "-override-transport-restrictions"
-
+      - "9003:9003"
   ledger-1:
     <<: *service-node
     container_name: chat-ledger-1
-    hostname: ledger-1
-    ports:
-      - "9003:9003"
+    network_mode: "service:vpn-ledger-1"
+    depends_on:
+      vpn-ledger-1:
+        condition: service_healthy
     volumes:
       - ../topology/output/nodes/chat-ledger-1/node-identity.pem:/app/node-identity.pem:ro
       - ../topology/output/nodes/chat-ledger-1/services:/app/services:ro
       - ../topology/output/nodes/chat-ledger-1/addons:/app/addons:ro
       - ../topology/output/nodes/chat-ledger-1/figs:/app/figs:ro
+      - ./node-bootstrap.json:/app/node-bootstrap.json:ro
     command:
+      - "-config=/app/node-bootstrap.json"
       - "-privkey=/app/node-identity.pem"
       - "-services-dir=/app/services"
       - "-addons-dir=/app/addons"
@@ -85,19 +131,34 @@ services:
       - "-allow-insecure-figs"
       - "-tunnel-enabled"
       - "-override-transport-restrictions"
+      - "-nat-traversal"
 
+  vpn-ledger-2:
+    <<: *gluetun
+    container_name: vpn-ledger-2
+    networks: [net-ledger-2]
+    environment:
+      <<: *gluetun-env
+      WIREGUARD_PRIVATE_KEY: ${MULLVAD_PRIVKEY_LEDGER_2}
+      WIREGUARD_ADDRESSES: ${MULLVAD_ADDR_LEDGER_2}
+      SERVER_HOSTNAMES: ${MULLVAD_HOSTNAME_LEDGER_2}
+    ports:
+      - "9004:9004"
   ledger-2:
     <<: *service-node
     container_name: chat-ledger-2
-    hostname: ledger-2
-    ports:
-      - "9004:9004"
+    network_mode: "service:vpn-ledger-2"
+    depends_on:
+      vpn-ledger-2:
+        condition: service_healthy
     volumes:
       - ../topology/output/nodes/chat-ledger-2/node-identity.pem:/app/node-identity.pem:ro
       - ../topology/output/nodes/chat-ledger-2/services:/app/services:ro
       - ../topology/output/nodes/chat-ledger-2/addons:/app/addons:ro
       - ../topology/output/nodes/chat-ledger-2/figs:/app/figs:ro
+      - ./node-bootstrap.json:/app/node-bootstrap.json:ro
     command:
+      - "-config=/app/node-bootstrap.json"
       - "-privkey=/app/node-identity.pem"
       - "-services-dir=/app/services"
       - "-addons-dir=/app/addons"
@@ -108,19 +169,34 @@ services:
       - "-allow-insecure-figs"
       - "-tunnel-enabled"
       - "-override-transport-restrictions"
+      - "-nat-traversal"
 
+  vpn-mod-1:
+    <<: *gluetun
+    container_name: vpn-mod-1
+    networks: [net-mod-1]
+    environment:
+      <<: *gluetun-env
+      WIREGUARD_PRIVATE_KEY: ${MULLVAD_PRIVKEY_MOD_1}
+      WIREGUARD_ADDRESSES: ${MULLVAD_ADDR_MOD_1}
+      SERVER_HOSTNAMES: ${MULLVAD_HOSTNAME_MOD_1}
+    ports:
+      - "9005:9005"
   mod-1:
     <<: *service-node
     container_name: chat-mod-1
-    hostname: mod-1
-    ports:
-      - "9005:9005"
+    network_mode: "service:vpn-mod-1"
+    depends_on:
+      vpn-mod-1:
+        condition: service_healthy
     volumes:
       - ../topology/output/nodes/chat-mod-1/node-identity.pem:/app/node-identity.pem:ro
       - ../topology/output/nodes/chat-mod-1/services:/app/services:ro
       - ../topology/output/nodes/chat-mod-1/addons:/app/addons:ro
       - ../topology/output/nodes/chat-mod-1/figs:/app/figs:ro
+      - ./node-bootstrap.json:/app/node-bootstrap.json:ro
     command:
+      - "-config=/app/node-bootstrap.json"
       - "-privkey=/app/node-identity.pem"
       - "-services-dir=/app/services"
       - "-addons-dir=/app/addons"
@@ -131,19 +207,34 @@ services:
       - "-allow-insecure-figs"
       - "-tunnel-enabled"
       - "-override-transport-restrictions"
+      - "-nat-traversal"
 
+  vpn-admin-1:
+    <<: *gluetun
+    container_name: vpn-admin-1
+    networks: [net-admin-1]
+    environment:
+      <<: *gluetun-env
+      WIREGUARD_PRIVATE_KEY: ${MULLVAD_PRIVKEY_ADMIN_1}
+      WIREGUARD_ADDRESSES: ${MULLVAD_ADDR_ADMIN_1}
+      SERVER_HOSTNAMES: ${MULLVAD_HOSTNAME_ADMIN_1}
+    ports:
+      - "9006:9006"
   admin-1:
     <<: *service-node
     container_name: chat-admin-1
-    hostname: admin-1
-    ports:
-      - "9006:9006"
+    network_mode: "service:vpn-admin-1"
+    depends_on:
+      vpn-admin-1:
+        condition: service_healthy
     volumes:
       - ../topology/output/nodes/chat-admin-1/node-identity.pem:/app/node-identity.pem:ro
       - ../topology/output/nodes/chat-admin-1/services:/app/services:ro
       - ../topology/output/nodes/chat-admin-1/addons:/app/addons:ro
       - ../topology/output/nodes/chat-admin-1/figs:/app/figs:ro
+      - ./node-bootstrap.json:/app/node-bootstrap.json:ro
     command:
+      - "-config=/app/node-bootstrap.json"
       - "-privkey=/app/node-identity.pem"
       - "-services-dir=/app/services"
       - "-addons-dir=/app/addons"
@@ -154,51 +245,14 @@ services:
       - "-allow-insecure-figs"
       - "-tunnel-enabled"
       - "-override-transport-restrictions"
+      - "-nat-traversal"
 
-  proxy-1:
-    <<: *service-node
-    container_name: chat-proxy-1
-    hostname: proxy-1
-    ports:
-      - "9007:9007"
-      - "9090:9090"
-    volumes:
-      - ../topology/output/nodes/chat-proxy-1/node-identity.pem:/app/node-identity.pem:ro
-      - ../topology/output/nodes/chat-proxy-1/addons:/app/addons:ro
-      - ../topology/output/nodes/chat-proxy-1/figs:/app/figs:ro
-    command:
-      - "-privkey=/app/node-identity.pem"
-      - "-addons-dir=/app/addons"
-      - "-figs-dir=/app/figs"
-      - "-listen=/ip4/0.0.0.0/tcp/9007"
-      - "-no-crypto"
-      - "-allow-expired-figs"
-      - "-allow-insecure-figs"
-      - "-tunnel-enabled"
-      - "-override-transport-restrictions"
-
-  proxy-2:
-    <<: *service-node
-    container_name: chat-proxy-2
-    hostname: proxy-2
-    ports:
-      - "9008:9008"
-      - "9091:9091"
-    volumes:
-      - ../topology/output/nodes/chat-proxy-2/node-identity.pem:/app/node-identity.pem:ro
-      - ../topology/output/nodes/chat-proxy-2/addons:/app/addons:ro
-      - ../topology/output/nodes/chat-proxy-2/figs:/app/figs:ro
-    command:
-      - "-privkey=/app/node-identity.pem"
-      - "-addons-dir=/app/addons"
-      - "-figs-dir=/app/figs"
-      - "-listen=/ip4/0.0.0.0/tcp/9008"
-      - "-no-crypto"
-      - "-allow-expired-figs"
-      - "-allow-insecure-figs"
-      - "-tunnel-enabled"
-      - "-override-transport-restrictions"
-
+# Each VPN sidecar lives on its own dedicated bridge network so that the
+# only path between containers is through the public internet via their
+# respective Mullvad WireGuard tunnels — matching real-world deployment.
 networks:
-  banyan-net:
-    driver: bridge
+  net-static-1: { driver: bridge }
+  net-ledger-1: { driver: bridge }
+  net-ledger-2: { driver: bridge }
+  net-mod-1:    { driver: bridge }
+  net-admin-1:  { driver: bridge }

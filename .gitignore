@@ -65,5 +65,8 @@ apps/chat-service/chat-service
 apps/chat-service/data/
 apps/chat-frontend/dist/
 
-# Generated topology (keep config, ignore output for production)
-# apps/chat-service/topology/output/
+# Generated topology (keep config, ignore output — contains private keys)
+apps/chat-service/topology/output/
+
+# Generated test-utils user nodes (contain private keys)
+test-utils/user-node/nodes/

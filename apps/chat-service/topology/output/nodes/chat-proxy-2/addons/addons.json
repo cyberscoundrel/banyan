@@ -1,9 +1,0 @@
-{
-  "addons": [
-    {
-      "name": "http-proxy",
-      "exec": "/usr/local/bin/proxy-addon",
-      "args": ["-addr", ":9091"]
-    }
-  ]
-}

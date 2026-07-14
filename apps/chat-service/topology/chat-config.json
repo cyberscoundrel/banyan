@@ -9,17 +9,9 @@
             "services": [
                 {
                     "key": "chat-static-key",
-                    "figs": ["chat-fig"]
-                }
-            ]
-        },
-        {
-            "name": "chat-static-2",
-            "pk": "true",
-            "services": [
-                {
-                    "key": "chat-static-key",
-                    "figs": ["chat-fig"]
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
                 }
             ]
         },
@@ -29,11 +21,15 @@
             "services": [
                 {
                     "key": "chat-static-key",
-                    "figs": ["chat-fig"]
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
                 },
                 {
                     "key": "chat-ledger-key",
-                    "figs": ["chat-fig"]
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
                 }
             ]
         },
@@ -43,11 +39,15 @@
             "services": [
                 {
                     "key": "chat-static-key",
-                    "figs": ["chat-fig"]
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
                 },
                 {
                     "key": "chat-ledger-key",
-                    "figs": ["chat-fig"]
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
                 }
             ]
         },
@@ -57,15 +57,21 @@
             "services": [
                 {
                     "key": "chat-static-key",
-                    "figs": ["chat-fig"]
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
                 },
                 {
                     "key": "chat-ledger-key",
-                    "figs": ["chat-fig"]
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
                 },
                 {
                     "key": "chat-mod-key",
-                    "figs": ["chat-fig"]
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
                 }
             ]
         },
@@ -75,19 +81,27 @@
             "services": [
                 {
                     "key": "chat-static-key",
-                    "figs": ["chat-fig"]
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
                 },
                 {
                     "key": "chat-ledger-key",
-                    "figs": ["chat-fig"]
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
                 },
                 {
                     "key": "chat-mod-key",
-                    "figs": ["chat-fig"]
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
                 },
                 {
                     "key": "chat-admin-key",
-                    "figs": ["chat-fig"]
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
                 }
             ]
         }

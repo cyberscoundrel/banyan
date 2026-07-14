@@ -2086,8 +2086,21 @@ func (sh *ServiceHandlers) processFigBytes(w http.ResponseWriter, data []byte, s
 			normalizedKeys = append(normalizedKeys, fmt.Sprintf("%x", marshaled))
 		}
 		if len(normalizedKeys) > 0 {
-			// Schedule expiry-based cleanup. Attribute keys to the addon that produced this fig if any.
-			SetServiceKeysForAliasWithExpiry(fig.ServiceAlias, normalizedKeys, fig.ExpiresAt, strings.TrimSpace(addonName))
+			// Honor --allow-expired-figs: if the node was explicitly told to
+			// accept expired figs, don't let the expiry cache evict the alias
+			// (immediately or on a timer). Otherwise an already-expired fig
+			// would be registered and instantly removed, so /services/alias/resolve
+			// 404s and the http-proxy addon returns 502.
+			allowExpired := false
+			if cfg := sh.node.GetConfig(); cfg != nil && cfg.AllowExpiredFigs != nil {
+				allowExpired = *cfg.AllowExpiredFigs
+			}
+			if allowExpired {
+				SetServiceKeysForAlias(fig.ServiceAlias, normalizedKeys, strings.TrimSpace(addonName))
+			} else {
+				// Schedule expiry-based cleanup. Attribute keys to the addon that produced this fig if any.
+				SetServiceKeysForAliasWithExpiry(fig.ServiceAlias, normalizedKeys, fig.ExpiresAt, strings.TrimSpace(addonName))
+			}
 			// Also store the full fig data for hierarchical path matching
 			SetFigDataForAlias(fig.ServiceAlias, fig, strings.TrimSpace(addonName))
 		}

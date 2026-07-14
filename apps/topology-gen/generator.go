@@ -30,8 +30,11 @@ type Node struct {
 }
 
 type Service struct {
-	Key  string   `json:"key"`
-	Figs []string `json:"figs"`
+	Key          string   `json:"key"`
+	Figs         []string `json:"figs"`
+	RouteURL     string   `json:"routeUrl,omitempty"`
+	RoutePrefix  string   `json:"routePrefix,omitempty"`
+	KeepFullPath bool     `json:"keepFullPath,omitempty"`
 }
 
 type Fig struct {
@@ -50,11 +53,14 @@ type FigNode struct {
 type ServicesConfig map[string]ServiceEntry
 
 type ServiceEntry struct {
-	Directory string   `json:"directory"`
-	PEM       string   `json:"pem,omitempty"`
-	PEMs      []string `json:"pems,omitempty"`
-	Fig       string   `json:"fig,omitempty"`
-	Figs      []string `json:"figs,omitempty"`
+	Directory    string   `json:"directory"`
+	PEM          string   `json:"pem,omitempty"`
+	PEMs         []string `json:"pems,omitempty"`
+	Fig          string   `json:"fig,omitempty"`
+	Figs         []string `json:"figs,omitempty"`
+	RouteURL     string   `json:"routeUrl,omitempty"`
+	RoutePrefix  string   `json:"routePrefix,omitempty"`
+	KeepFullPath bool     `json:"keepFullPath,omitempty"`
 }
 
 // FigFile represents the structure of a fig file
@@ -367,8 +373,11 @@ func generateNodeDirectory(node Node, config *Config, nodesDir, globalKeysDir st
 
 		// Add to services config
 		entry := ServiceEntry{
-			Directory: service.Key,
-			PEM:       service.Key + ".pem",
+			Directory:    service.Key,
+			PEM:          service.Key + ".pem",
+			RouteURL:     service.RouteURL,
+			RoutePrefix:  service.RoutePrefix,
+			KeepFullPath: service.KeepFullPath,
 		}
 		if len(figPaths) == 1 {
 			entry.Fig = figPaths[0]

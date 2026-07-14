@@ -65,6 +65,104 @@ node apps/chat-service/dist/index.js --config config.example.json
 make -C apps/chat-service dev
 ```
 
+## Docker Test Cluster
+
+The `apps/chat-service/docker/` directory contains a docker-compose file that
+brings up a 6-node test cluster mirroring a realistic deployment: every service
+node runs in its own isolated Docker bridge network, so peer discovery happens
+over the public IPFS DHT with libp2p NAT traversal (hole-punching + circuit
+relay v2) — the same path a real user on their own machine would take. No
+pre-generated keys or figs are committed to the repo; they are regenerated
+fresh on every `docker:up` from [`topology/chat-config.json`](topology/chat-config.json).
+
+### One-shot bring-up from a fresh clone
+
+```bash
+npm install
+nx run chat-frontend:build
+nx run chat-service:docker:up
+```
+
+That last command transitively:
+
+1. Builds `topology-gen` and the `banyan` node binary.
+2. Regenerates `apps/chat-service/topology/output/` (keys, signed figs, per-node
+   directories) via `nx run chat-service:topology`.
+3. Builds the `banyan-node:latest` Docker image (includes the Node.js
+   chat-service and the `banyan` + `proxy-addon` binaries).
+4. Starts the 6 service nodes (`chat-static-1`, `chat-static-2`, `chat-ledger-1`,
+   `chat-ledger-2`, `chat-mod-1`, `chat-admin-1`), each on its own bridge
+   network with `-nat-traversal` enabled.
+
+To stop the cluster: `nx run chat-service:docker:down`.
+
+### Spinning up a user node for browser access
+
+Service nodes do not publish the http-proxy addon — the proxy is a
+*client-side* entry point used to access services from a browser. To create
+one, use the test-utils script:
+
+```bash
+./test-utils/user-node/generate-user-node.sh --name me --proxy-port 9090
+(cd test-utils/user-node/nodes/me && ./up.sh)
+# browser -> http://localhost:9090
+```
+
+On Windows:
+
+```powershell
+.\test-utils\user-node\generate-user-node.ps1 -Name me -ProxyPort 9090
+cd .\test-utils\user-node\nodes\me
+.\up.ps1
+```
+
+Each generated user node gets:
+
+- A freshly generated Ed25519 identity key (`node-identity.pem`) in PKCS8 PEM
+  form, produced via `openssl genpkey -algorithm ed25519` — same format libp2p
+  reads for the service nodes.
+- A copy of the signed client fig (`chat-fig.json`) from the most recent
+  topology regeneration, defaulted from `chat-static-1`'s figs directory.
+- An `http-proxy` addon exposing the browser-facing HTTP proxy on container
+  port `9090`.
+- A per-node `Dockerfile` (`FROM banyan-node:latest` + `COPY`) and an `up.sh`
+  that creates a dedicated `user-<name>` bridge network and runs the
+  container. Each user node is isolated on its own bridge so discovery
+  exercises the DHT path, matching the isolation the service nodes have.
+
+Options:
+
+| Flag (bash / PowerShell)       | Default | Description                            |
+| ------------------------------ | ------- | -------------------------------------- |
+| `--name` / `-Name`             | —       | Required; used for container/image/network/output dir. |
+| `--proxy-port` / `-ProxyPort`  | `9090`  | Host port mapped to container `:9090`. |
+| `--listen-port` / `-ListenPort`| `9100`  | Host port mapped to container `:9100` (libp2p listen). |
+| `--fig` / `-Fig`               | `chat-static-1`'s fig | Signed client fig to bake in. |
+| `--output-dir` / `-OutputDir`  | `test-utils/user-node/nodes/<name>` | Where to write the generated directory. |
+
+Generated user-node directories live under
+`test-utils/user-node/nodes/` (gitignored). To tear one down:
+`./test-utils/user-node/nodes/<name>/down.sh` (or `.\down.ps1` on Windows).
+
+### Caveats to expect when testing
+
+- **First convergence is slow.** libp2p's DHT advertise + `FindPeers` ticker
+  is 30 seconds (see `apps/node/discovery/manager.go`), so cluster formation
+  after `docker:up` can take up to a minute before all nodes have found each
+  other. Subsequent reconnects are faster.
+- **Same-host DCUtR may fall back to relay.** When two Docker Desktop
+  containers on the same host both observe the host's public IP via AutoNAT,
+  libp2p's hole-punching protocol sees identical observed addresses and may
+  refuse to punch. In that case connections ride over circuit relay v2 via
+  public IPFS relays — still functional, but with added latency. If this
+  becomes a problem, a follow-up would be a Go-side `libp2p.AddrFactory`
+  tweak to additionally announce `host.docker.internal:<hostPort>`.
+- **Global peer-discovery rendezvous.** All banyan nodes advertise under the
+  string `peer-discovery` on the global DHT and may connect to unrelated
+  banyan nodes on the internet. This is intentional — it strengthens the
+  network and provides additional gossip relays. A scoped/hierarchical
+  rendezvous is a separate future feature.
+
 ## Configuration
 
 | Flag | Default | Description |

@@ -29,6 +29,21 @@
         "command": "node dist/index.js"
       }
     },
+    "topology": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["topology-gen:build", "node:build"],
+      "inputs": ["{projectRoot}/topology/chat-config.json"],
+      "outputs": ["{projectRoot}/topology/output"],
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "./dist/apps/topology-gen/generator apps/chat-service/topology/chat-config.json apps/chat-service/topology/output --banyan-path=../../../../../dist/apps/node"
+      },
+      "configurations": {
+        "windows": {
+          "command": "powershell -Command \"& .\\dist\\apps\\topology-gen\\generator.exe apps\\chat-service\\topology\\chat-config.json apps\\chat-service\\topology\\output --banyan-path=../../../../../dist/apps/node\""
+        }
+      }
+    },
     "docker:build": {
       "executor": "nx:run-commands",
       "dependsOn": ["chat-frontend:build"],
@@ -40,7 +55,7 @@
     },
     "docker:up": {
       "executor": "nx:run-commands",
-      "dependsOn": ["docker:build"],
+      "dependsOn": ["docker:build", "topology"],
       "options": {
         "cwd": "apps/chat-service/docker",
         "command": "docker compose -f docker-compose.banyan.yml up -d"
