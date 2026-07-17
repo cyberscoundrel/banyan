@@ -36,6 +36,9 @@ __debug_bin*
 .DS_Store
 Thumbs.db
 
+# Archives (avoid accidentally committing large/personal archives)
+*.rar
+
 # Logs
 *.log
 
