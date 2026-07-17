@@ -56,7 +56,7 @@ func setupTestManager(t *testing.T) (*Manager, context.Context) {
 		data      interface{}
 	}, 0)}
 
-	manager := NewManager(h, ctx, nil, nil, topic, mockBroadcaster).(*Manager)
+	manager := NewManager(h, ctx, nil, nil, topic, mockBroadcaster, nil).(*Manager)
 	return manager, ctx
 }
 

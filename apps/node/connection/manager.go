@@ -25,7 +25,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
+	"banyan/attest"
 	"banyan/interfaces"
+	"banyan/peerstore"
 	"banyan/types"
 )
 
@@ -48,13 +50,20 @@ type Manager struct {
 	// Discovery dependencies
 	dht         *dht.IpfsDHT
 	gossipTopic *pubsub.Topic
+
+	// peerStore is the durable persistence tree. Observed HTTP-verified peers
+	// are recorded here so they can be warm-dialed after a restart. May be nil
+	// (persistence disabled); all uses must nil-check.
+	peerStore peerstore.PeerStore
 }
 
 // NewManager creates a new connection manager with the given libp2p host,
-// context, HTTP transport, DHT instance, gossip topic, and event broadcaster.
-// The manager will use the DHT and gossip topic for peer discovery operations.
+// context, HTTP transport, DHT instance, gossip topic, event broadcaster, and
+// optional durable peer store (may be nil). The manager will use the DHT and
+// gossip topic for peer discovery operations, and records verified peers into
+// the store when present.
 func NewManager(host host.Host, ctx context.Context, httpTransport *http.Transport,
-	dht *dht.IpfsDHT, gossipTopic *pubsub.Topic, eventBroadcaster interfaces.EventBroadcaster) interfaces.PeerManager {
+	dht *dht.IpfsDHT, gossipTopic *pubsub.Topic, eventBroadcaster interfaces.EventBroadcaster, peerStore peerstore.PeerStore) interfaces.PeerManager {
 	return &Manager{
 		host:             host,
 		ctx:              ctx,
@@ -65,6 +74,7 @@ func NewManager(host host.Host, ctx context.Context, httpTransport *http.Transpo
 		eventBroadcaster: eventBroadcaster,
 		dht:              dht,
 		gossipTopic:      gossipTopic,
+		peerStore:        peerStore,
 	}
 }
 
@@ -162,7 +172,84 @@ func (m *Manager) AddTrackedPeer(peerID peer.ID, options types.PeerOptions) *typ
 	}
 	connItem.LastActivity = time.Now()
 
+	// Persist a service-scoped observation so this peer can be warm-dialed after
+	// a restart. Copy the key set out; the async record does its own I/O.
+	if m.peerStore != nil && len(connItem.ServiceKeys) > 0 {
+		keys := append([][]byte(nil), connItem.ServiceKeys...)
+		source := sourceForConnType(connItem.ConnectionType)
+		verified := connItem.HTTPCapable
+		go m.recordPeer(peerID, keys, source, verified)
+	}
+
 	return connItem
+}
+
+// sourceForConnType maps a connection type onto a persistence-tree source tag.
+func sourceForConnType(ct string) string {
+	switch ct {
+	case types.ConnTypeManual:
+		return peerstore.SourceManual
+	case types.ConnTypeHTTPVerified:
+		return peerstore.SourceService
+	default:
+		return peerstore.SourceGossip
+	}
+}
+
+// recordPeer persists an observation of peerID for each of serviceKeys into the
+// durable persistence tree (no-op when no store is configured or the peer has
+// no service keys). When verified is true it records a successful dial
+// (last_success), so the peer ranks as a warm-dial candidate after a restart.
+// It reads the peer's current multiaddrs from the libp2p peerstore, which
+// include any /p2p-circuit relay addresses needed to redial a NAT-stuck peer.
+// Intended to be called from a goroutine; it performs I/O and never touches
+// connection state under the manager's lock.
+func (m *Manager) recordPeer(peerID peer.ID, serviceKeys [][]byte, source string, verified bool) {
+	if m.peerStore == nil || len(serviceKeys) == 0 {
+		return
+	}
+	addrs := m.host.Peerstore().Addrs(peerID)
+	addrStrs := make([]string, 0, len(addrs))
+	for _, a := range addrs {
+		addrStrs = append(addrStrs, a.String())
+	}
+	var lastSuccess *time.Time
+	if verified {
+		now := time.Now()
+		lastSuccess = &now
+	}
+	// Sign attestations only for verified observations: we only vouch (and later
+	// re-share) for peers we have actually reached.
+	var signer crypto.PrivKey
+	if verified {
+		signer = m.host.Peerstore().PrivKey(m.host.ID())
+	}
+	observedAt := time.Now().Unix()
+	for _, sk := range serviceKeys {
+		if len(sk) == 0 {
+			continue
+		}
+		keyHex := fmt.Sprintf("%x", sk)
+		var attestation []byte
+		if signer != nil {
+			if att, err := attest.Sign(signer, attest.Claim{
+				Subject:    peerID.String(),
+				ServiceKey: keyHex,
+				Addrs:      addrStrs,
+				ObservedAt: observedAt,
+			}); err == nil {
+				attestation, _ = att.Marshal()
+			}
+		}
+		_ = m.peerStore.Upsert(m.ctx, peerstore.Entry{
+			ServiceKey:  keyHex,
+			PeerID:      peerID.String(),
+			Multiaddrs:  addrStrs,
+			Source:      source,
+			LastSuccess: lastSuccess,
+			Attestation: attestation,
+		})
+	}
 }
 
 // generateUniqueAliasLocked generates a unique 4-character alias for a peer.
@@ -211,6 +298,13 @@ func (m *Manager) MarkPeerHTTPCapable(peerID peer.ID, bidirectional bool) {
 			"bidirectional": bidirectional,
 			"time":          now,
 		})
+
+		// This is the definitive "verified reachable" moment: persist the peer
+		// as a successful dial for each of its service keys.
+		if m.peerStore != nil && len(conn.ServiceKeys) > 0 {
+			keys := append([][]byte(nil), conn.ServiceKeys...)
+			go m.recordPeer(peerID, keys, peerstore.SourceService, true)
+		}
 	}
 }
 
