@@ -52,6 +52,7 @@ func newTestHandler(t *testing.T) (*Handler, crypto.PrivKey) {
 		eventBroadcaster,
 		routeTable,
 		false,
+		nil,
 	).(*Handler)
 
 	return handler, priv
@@ -208,6 +209,7 @@ func TestHandleGreetingsWithServiceKey(t *testing.T) {
 		eventBroadcaster,
 		routeTable,
 		false,
+		nil,
 	).(*Handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/greetings", nil)
@@ -385,6 +387,7 @@ func TestHandleServiceFigsWithBeacon(t *testing.T) {
 		eventBroadcaster,
 		routeTable,
 		false,
+		nil,
 	).(*Handler)
 
 	body := bytes.NewBufferString(`{"nonce":"test123","requesterPeerId":"12D3KooWTest"}`)
@@ -540,6 +543,7 @@ func TestHandleConnectionsStatus(t *testing.T) {
 		eventBroadcaster,
 		routeTable,
 		false,
+		nil,
 	).(*Handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/connections", nil)

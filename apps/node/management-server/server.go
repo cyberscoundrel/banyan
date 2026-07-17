@@ -140,6 +140,7 @@ func (ms *ManagementServer) registerRoutes(mux *http.ServeMux) {
 	libp2pHandlers := handlers.NewLibP2PHandlers(ms.node)
 	proxyHandlers := handlers.NewProxyHandlers(ms.node, ms.BroadcastEvent)
 	peerHandlers := handlers.NewPeerHandlers(ms.node)
+	persistenceHandlers := handlers.NewPersistenceHandlers(ms.node)
 	wsHandlers := handlers.NewWebSocketHandlers(ms.hub)
 	serviceHandlers := handlers.NewServiceHandlers(ms.node, ms.BroadcastEvent)
 	routerHandlers := handlers.NewRouterHandlers(ms.node)
@@ -164,6 +165,14 @@ func (ms *ManagementServer) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/network/connect-multiaddr", libp2pHandlers.HandleConnectWithMultiaddr)
 	mux.HandleFunc("/network/peers/add", peerHandlers.HandleAddTrackedPeer)
 	mux.HandleFunc("/network/peers/all", peerHandlers.HandleGetAllPeers)
+	// Persistence tree (localhost only): GET dumps, POST imports as candidates.
+	mux.HandleFunc("/peers/persisted", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			persistenceHandlers.HandleImportPersistedPeers(w, r)
+			return
+		}
+		persistenceHandlers.HandleGetPersistedPeers(w, r)
+	})
 
 	// Service management endpoints
 	mux.HandleFunc("/services/find", serviceHandlers.HandleFind)
