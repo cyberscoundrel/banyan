@@ -563,7 +563,6 @@ func (sh *ServiceHandlers) HandleAliasResolve(w http.ResponseWriter, r *http.Req
 
 	http.Error(w, fmt.Sprintf("alias '%s' resolved but no connected peers found for its service keys", alias), http.StatusBadGateway)
 }
-
 // HandleLocatorStart handles the /services/locator/start endpoint to start
 // a service locator for discovering peers that announce a specific service key.
 func (sh *ServiceHandlers) HandleLocatorStart(w http.ResponseWriter, r *http.Request) {
