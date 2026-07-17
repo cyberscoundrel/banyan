@@ -8,15 +8,18 @@ export class WsSyncServer {
   private state: State;
   private storage: SQLiteStorage;
   private onEntry: (entry: Entry, fromPeerId: string) => void;
+  private localPeerId: string;
 
   constructor(
     state: State,
     storage: SQLiteStorage,
     onEntry: (entry: Entry, fromPeerId: string) => void,
+    localPeerId = '',
   ) {
     this.state = state;
     this.storage = storage;
     this.onEntry = onEntry;
+    this.localPeerId = localPeerId;
 
     this.wss = new WebSocketServer({ noServer: true });
 
@@ -40,6 +43,8 @@ export class WsSyncServer {
           } else if (msg.type === 'sync:full' && Array.isArray(msg.entries)) {
             const fromPeerId = msg.from || 'unknown';
             this.handleSyncEntries(ws, msg.entries, fromPeerId);
+          } else if (msg.type === 'sync:digest' && Array.isArray(msg.hashes)) {
+            this.handleDigest(ws, msg.hashes);
           }
         } catch (e) {
           console.error('[ws-sync-server] Failed to parse message:', e);
@@ -69,6 +74,22 @@ export class WsSyncServer {
         client.send(msg);
       }
     }
+  }
+
+  // handleDigest answers a peer's anti-entropy digest: the peer sent the set of
+  // entry hashes it holds, so we reply with every entry it's missing. Hash-based,
+  // so it needs no clocks and is idempotent (the peer's CRDT merge dedupes).
+  private handleDigest(ws: WebSocket, hashes: string[]): void {
+    const have = new Set(hashes);
+    const missing: Entry[] = [];
+    for (const entry of this.state.entries.values()) {
+      if (entry.hash && !have.has(entry.hash)) {
+        missing.push(entry);
+      }
+    }
+    if (missing.length === 0) return;
+    ws.send(JSON.stringify({ type: 'sync:entries', entries: missing, from: this.localPeerId }));
+    console.log(`[ws-sync-server] Digest reconcile: sent ${missing.length} missing entries`);
   }
 
   private handleSyncEntries(ws: WebSocket, entries: Entry[], fromPeerId: string): void {

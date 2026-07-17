@@ -4,6 +4,16 @@ import { mergeIntoState } from './crdt.js';
 import net from 'net';
 import crypto from 'crypto';
 
+// Periodic anti-entropy: live broadcasts only reach peers connected at that
+// instant, and full sync only happens on (re)connect. Over flaky NAT/relay
+// links that leaves permanent gaps. On this interval each node advertises the
+// set of entry hashes it holds; peers reply with anything it's missing. This is
+// hash-based (not timestamp-based), so it's immune to any node clock skew.
+const ANTI_ENTROPY_INTERVAL_MS = 15_000;
+// Small delay after connect before the first digest, so the initial full sync
+// has a chance to land first.
+const ANTI_ENTROPY_INITIAL_DELAY_MS = 3_000;
+
 export class MultisocketSync {
   private proxyUrl: string;
   private figDomain: string;
@@ -16,6 +26,8 @@ export class MultisocketSync {
   private closed = false;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private pingTimer?: ReturnType<typeof setInterval>;
+  private antiEntropyTimer?: ReturnType<typeof setInterval>;
+  private antiEntropyInitialTimer?: ReturnType<typeof setTimeout>;
   private buffer = Buffer.alloc(0);
 
   constructor(
@@ -44,10 +56,35 @@ export class MultisocketSync {
     this.closed = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     if (this.pingTimer) clearInterval(this.pingTimer);
+    this.stopAntiEntropy();
     if (this.sock) {
       this.sock.destroy();
       this.sock = null;
     }
+  }
+
+  private stopAntiEntropy(): void {
+    if (this.antiEntropyInitialTimer) {
+      clearTimeout(this.antiEntropyInitialTimer);
+      this.antiEntropyInitialTimer = undefined;
+    }
+    if (this.antiEntropyTimer) {
+      clearInterval(this.antiEntropyTimer);
+      this.antiEntropyTimer = undefined;
+    }
+  }
+
+  // sendDigest advertises the hashes of every entry we hold. Each connected
+  // peer's ws-sync server replies with any entries whose hash is absent here,
+  // backfilling gaps left by dropped live broadcasts.
+  private sendDigest(): void {
+    if (!this.sock) return;
+    const hashes: string[] = [];
+    for (const entry of this.state.entries.values()) {
+      if (entry.hash) hashes.push(entry.hash);
+    }
+    const payload = JSON.stringify({ d: { type: 'sync:digest', hashes, from: this.localPeerId } });
+    this.sendWsFrame(0x1, Buffer.from(payload));
   }
 
   broadcastEntry(entry: Entry): void {
@@ -101,6 +138,8 @@ export class MultisocketSync {
           this.pingTimer = setInterval(() => {
             this.sendWsFrame(0x9, Buffer.alloc(0));
           }, 30_000);
+          this.antiEntropyInitialTimer = setTimeout(() => this.sendDigest(), ANTI_ENTROPY_INITIAL_DELAY_MS);
+          this.antiEntropyTimer = setInterval(() => this.sendDigest(), ANTI_ENTROPY_INTERVAL_MS);
           console.log('[ws-sync] Multisocket connected');
         } else {
           console.error(`[ws-sync] WebSocket upgrade failed: ${statusLine}`);
@@ -118,6 +157,7 @@ export class MultisocketSync {
         if (this.sock === sock) {
           this.sock = null;
           if (this.pingTimer) clearInterval(this.pingTimer);
+          this.stopAntiEntropy();
           console.log('[ws-sync] Disconnected');
           this.scheduleReconnect();
         }

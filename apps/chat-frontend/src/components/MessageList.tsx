@@ -6,7 +6,8 @@ interface MessageListProps {
 }
 
 function formatTime(timestamp: number): string {
-  const date = new Date(timestamp / 1000000)
+  // Ledger entries store Date.now() (epoch milliseconds); use it directly.
+  const date = new Date(timestamp)
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 

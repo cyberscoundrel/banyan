@@ -105,7 +105,7 @@ export function createApp(config: Config): { app: express.Application; server: S
         } else if (entry.type === 'promote') {
           hub.broadcast('mod:promote', { user: entry.data });
         }
-      });
+      }, config.nodeId);
     }
 
     hub.attach(server);
