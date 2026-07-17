@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,6 +28,14 @@ type Node struct {
 	Name     string    `json:"name"`
 	PK       string    `json:"pk"`
 	Services []Service `json:"services"`
+	// HTTPProxy, when non-nil, overrides the global --http-proxy default for
+	// this node. When it resolves true, an addons/addons.json is emitted that
+	// runs the http-proxy addon so the node can originate proxied libp2p
+	// requests (e.g. the chat-service's multisocket ledger sync).
+	HTTPProxy *bool `json:"httpProxy,omitempty"`
+	// HTTPProxyPort overrides the listen port for this node's http-proxy addon
+	// (defaults to the global --http-proxy-port, which itself defaults to 9090).
+	HTTPProxyPort int `json:"httpProxyPort,omitempty"`
 }
 
 type Service struct {
@@ -63,6 +72,17 @@ type ServiceEntry struct {
 	KeepFullPath bool     `json:"keepFullPath,omitempty"`
 }
 
+// AddonsFile is the output structure for a node's addons/addons.json.
+type AddonsFile struct {
+	Addons []AddonEntry `json:"addons"`
+}
+
+type AddonEntry struct {
+	Name string   `json:"name"`
+	Exec string   `json:"exec"`
+	Args []string `json:"args"`
+}
+
 // FigFile represents the structure of a fig file
 type FigFile struct {
 	ServiceAlias        string    `json:"serviceAlias"`
@@ -75,14 +95,28 @@ type FigFile struct {
 // Global variable for banyan binary path (set via --banyan-path flag)
 var banyanPath string
 
+// http-proxy addon emission options (set via CLI flags). When httpProxyDefault
+// is true, every node gets the http-proxy addon unless a node opts out with
+// "httpProxy": false in its config.
+var (
+	httpProxyDefault bool
+	httpProxyPort    = 9090
+	proxyAddonExec   = "/usr/local/bin/proxy-addon"
+)
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: generator <config-file> [output-dir] [--banyan-path=<path>]")
 		fmt.Println("Example: generator example-config.json ./output --banyan-path=../../dist/apps/node")
 		fmt.Println("")
 		fmt.Println("Options:")
-		fmt.Println("  --banyan-path  Path to banyan binaries directory (contains win/, linux/, osx/)")
-		fmt.Println("                 If not specified, scripts will use a placeholder path")
+		fmt.Println("  --banyan-path       Path to banyan binaries directory (contains win/, linux/, osx/)")
+		fmt.Println("                      If not specified, scripts will use a placeholder path")
+		fmt.Println("  --http-proxy        Emit an http-proxy addon for every node (opt out per node")
+		fmt.Println("                      with \"httpProxy\": false). Per-node \"httpProxy\": true also works")
+		fmt.Println("                      without this flag.")
+		fmt.Println("  --http-proxy-port   Listen port for emitted http-proxy addons (default 9090)")
+		fmt.Println("  --proxy-addon-exec  Exec path for the proxy addon (default /usr/local/bin/proxy-addon)")
 		os.Exit(1)
 	}
 
@@ -95,6 +129,18 @@ func main() {
 		arg := os.Args[i]
 		if strings.HasPrefix(arg, "--banyan-path=") {
 			banyanPath = strings.TrimPrefix(arg, "--banyan-path=")
+		} else if arg == "--http-proxy" {
+			httpProxyDefault = true
+		} else if strings.HasPrefix(arg, "--http-proxy-port=") {
+			portStr := strings.TrimPrefix(arg, "--http-proxy-port=")
+			p, err := strconv.Atoi(portStr)
+			if err != nil || p <= 0 || p > 65535 {
+				fmt.Printf("Error: invalid --http-proxy-port value %q\n", portStr)
+				os.Exit(1)
+			}
+			httpProxyPort = p
+		} else if strings.HasPrefix(arg, "--proxy-addon-exec=") {
+			proxyAddonExec = strings.TrimPrefix(arg, "--proxy-addon-exec=")
 		} else if !strings.HasPrefix(arg, "-") && outputDir == "./topology-output" {
 			outputDir = arg
 		}
@@ -293,6 +339,28 @@ func generateNodeDirectory(node Node, config *Config, nodesDir, globalKeysDir st
 		return fmt.Errorf("failed to create services directory: %w", err)
 	}
 
+	// Resolve whether this node runs the http-proxy addon. Proxy-enabled nodes
+	// also get client copies of their figs (see below) so they can resolve the
+	// alias and discover other holders — required for chat-service ledger sync.
+	enableProxy := httpProxyDefault
+	if node.HTTPProxy != nil {
+		enableProxy = *node.HTTPProxy
+	}
+
+	// When the proxy is enabled, emit node-level client figs into figs/. The
+	// node's figs-dir loader keys off the "<alias>.fig" filename, so a node can
+	// resolve/locate an alias (act as a client) only if the fig lives here — the
+	// per-service copies under services/<key>/ make the node a server, not a
+	// client. nodeFigsWritten dedupes figs shared across multiple services.
+	var nodeFigsDir string
+	nodeFigsWritten := make(map[string]bool)
+	if enableProxy {
+		nodeFigsDir = filepath.Join(nodeDir, "figs")
+		if err := os.MkdirAll(nodeFigsDir, 0755); err != nil {
+			return fmt.Errorf("failed to create figs directory: %w", err)
+		}
+	}
+
 	// Build services.json config
 	servicesConfig := make(ServicesConfig)
 
@@ -369,6 +437,16 @@ func generateNodeDirectory(node Node, config *Config, nodesDir, globalKeysDir st
 				return fmt.Errorf("failed to save fig file: %w", err)
 			}
 			figPaths = append(figPaths, figName+".json")
+
+			// Also emit a node-level client copy (<alias>.fig) so a proxy-enabled
+			// node can resolve/discover this alias, not just serve it.
+			if enableProxy && !nodeFigsWritten[figName] {
+				nodeFigPath := filepath.Join(nodeFigsDir, figName+".fig")
+				if err := saveFigFile(figFile, nodeFigPath); err != nil {
+					return fmt.Errorf("failed to save node-level fig file: %w", err)
+				}
+				nodeFigsWritten[figName] = true
+			}
 		}
 
 		// Add to services config
@@ -391,6 +469,18 @@ func generateNodeDirectory(node Node, config *Config, nodesDir, globalKeysDir st
 	servicesConfigPath := filepath.Join(servicesDir, "services.json")
 	if err := saveServicesConfig(servicesConfig, servicesConfigPath); err != nil {
 		return fmt.Errorf("failed to save services config: %w", err)
+	}
+
+	// Optionally emit the http-proxy addon. enableProxy was resolved above; the
+	// port falls back from the per-node override to the global --http-proxy-port.
+	if enableProxy {
+		port := httpProxyPort
+		if node.HTTPProxyPort > 0 {
+			port = node.HTTPProxyPort
+		}
+		if err := generateHTTPProxyAddon(nodeDir, port); err != nil {
+			return fmt.Errorf("failed to emit http-proxy addon: %w", err)
+		}
 	}
 
 	// Generate startup script
@@ -570,6 +660,39 @@ func saveFigFile(figFile FigFile, filename string) error {
 
 	if err := os.WriteFile(filename, data, 0644); err != nil {
 		return fmt.Errorf("failed to write fig file: %w", err)
+	}
+
+	return nil
+}
+
+// generateHTTPProxyAddon writes an addons/addons.json that runs the http-proxy
+// addon on the given port. This lets the node originate proxied libp2p requests
+// (resolve fig aliases, open service tunnels, and run the multisocket pool that
+// the chat-service relies on for ledger sync).
+func generateHTTPProxyAddon(nodeDir string, port int) error {
+	addonsDir := filepath.Join(nodeDir, "addons")
+	if err := os.MkdirAll(addonsDir, 0755); err != nil {
+		return fmt.Errorf("failed to create addons directory: %w", err)
+	}
+
+	addons := AddonsFile{
+		Addons: []AddonEntry{
+			{
+				Name: "http-proxy",
+				Exec: proxyAddonExec,
+				Args: []string{"-addr", fmt.Sprintf(":%d", port)},
+			},
+		},
+	}
+
+	data, err := json.MarshalIndent(addons, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal addons file: %w", err)
+	}
+
+	addonsPath := filepath.Join(addonsDir, "addons.json")
+	if err := os.WriteFile(addonsPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write addons file: %w", err)
 	}
 
 	return nil
