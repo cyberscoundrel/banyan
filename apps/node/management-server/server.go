@@ -140,6 +140,7 @@ func (ms *ManagementServer) registerRoutes(mux *http.ServeMux) {
 	libp2pHandlers := handlers.NewLibP2PHandlers(ms.node)
 	proxyHandlers := handlers.NewProxyHandlers(ms.node, ms.BroadcastEvent)
 	peerHandlers := handlers.NewPeerHandlers(ms.node)
+	persistenceHandlers := handlers.NewPersistenceHandlers(ms.node)
 	wsHandlers := handlers.NewWebSocketHandlers(ms.hub)
 	serviceHandlers := handlers.NewServiceHandlers(ms.node, ms.BroadcastEvent)
 	routerHandlers := handlers.NewRouterHandlers(ms.node)
@@ -164,6 +165,14 @@ func (ms *ManagementServer) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/network/connect-multiaddr", libp2pHandlers.HandleConnectWithMultiaddr)
 	mux.HandleFunc("/network/peers/add", peerHandlers.HandleAddTrackedPeer)
 	mux.HandleFunc("/network/peers/all", peerHandlers.HandleGetAllPeers)
+	// Persistence tree (localhost only): GET dumps, POST imports as candidates.
+	mux.HandleFunc("/peers/persisted", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			persistenceHandlers.HandleImportPersistedPeers(w, r)
+			return
+		}
+		persistenceHandlers.HandleGetPersistedPeers(w, r)
+	})
 
 	// Service management endpoints
 	mux.HandleFunc("/services/find", serviceHandlers.HandleFind)
@@ -189,8 +198,13 @@ func (ms *ManagementServer) registerRoutes(mux *http.ServeMux) {
 	// Proxy endpoints
 	mux.HandleFunc("/proxy/peer/", proxyHandlers.HandleLibp2pProxy)
 	mux.HandleFunc("/proxy/alias/", proxyHandlers.HandleAliasProxy)
+	mux.HandleFunc("/proxy/alias/broadcast/", proxyHandlers.HandleAliasBroadcast)
 	mux.HandleFunc("/proxy/service/", proxyHandlers.HandleServiceKeyProxy)
 	mux.HandleFunc("/proxy/service-key/", proxyHandlers.HandleServiceKeyPrefixProxy)
+	mux.HandleFunc("/proxy/service-key/broadcast/", proxyHandlers.HandleServiceKeyPrefixBroadcast)
+
+	// Service alias resolution (for proxy addon tunnel routing)
+	mux.HandleFunc("/services/alias/resolve", serviceHandlers.HandleAliasResolve)
 
 	// Router management endpoints
 	mux.HandleFunc("/router/add", routerHandlers.HandleAddRoute)
@@ -198,6 +212,7 @@ func (ms *ManagementServer) registerRoutes(mux *http.ServeMux) {
 
 	// Tunnel management endpoints (for proxy addon and peer-to-peer TCP tunneling)
 	mux.HandleFunc("/tunnel/open", tunnelHandlers.HandleOpenTunnel)
+	mux.HandleFunc("/tunnel/open-service", tunnelHandlers.HandleOpenServiceTunnel)
 	mux.HandleFunc("/tunnel/close/", tunnelHandlers.HandleCloseTunnel)
 	mux.HandleFunc("/tunnel/list", tunnelHandlers.HandleListTunnels)
 

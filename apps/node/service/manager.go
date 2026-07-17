@@ -105,8 +105,11 @@ func (sl *ServiceLocator) Start() error {
 			})
 		}
 	}
-	// Start message processing
-	go sl.processMessages()
+	// Start message processing (only when we own the subscription; piggybacked
+	// locators receive messages forwarded by the beacon instead).
+	if sl.gossipSub != nil {
+		go sl.processMessages()
+	}
 
 	// Start periodic requests if in lookup mode
 	if sl.mode == types.ServiceBeaconModeLookup {
@@ -183,24 +186,44 @@ func (sl *ServiceLocator) processMessages() {
 			continue
 		}
 
+		sl.serviceManager.eventSender(EventInfo, map[string]interface{}{
+			"message": fmt.Sprintf("[LOCATOR] Received gossipsub message from %s (len=%d)", msg.ReceivedFrom.String()[:8], len(msg.Data)),
+		})
+
 		// Process the message
 		sl.handleMessage(msg)
 	}
 }
 
-// handleMessage processes a single PubSub message
+// handleMessage processes a single PubSub message, dispatching by the "type"
+// field to avoid ambiguous struct parsing (ServiceLookupRequest and
+// ServiceAnnouncement share the "serviceKey" JSON tag, so blind unmarshal
+// would misroute lookup requests through the announcement handler).
 func (sl *ServiceLocator) handleMessage(msg *pubsub.Message) {
-	// Try to parse as ServiceAnnouncement
-	var announcement types.ServiceAnnouncement
-	if err := json.Unmarshal(msg.Data, &announcement); err == nil {
-		sl.handleServiceAnnouncement(&announcement, msg.ReceivedFrom)
+	var envelope struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(msg.Data, &envelope); err != nil {
 		return
 	}
 
-	// Try to parse as ServiceLookupRequest
-	var request types.ServiceLookupRequest
-	if err := json.Unmarshal(msg.Data, &request); err == nil {
-		sl.handleServiceLookupRequest(&request, msg.ReceivedFrom)
+	switch envelope.Type {
+	case "service-announcement":
+		var announcement types.ServiceAnnouncement
+		if err := json.Unmarshal(msg.Data, &announcement); err == nil {
+			sl.handleServiceAnnouncement(&announcement, msg.ReceivedFrom)
+		}
+	case "service-lookup":
+		var request types.ServiceLookupRequest
+		if err := json.Unmarshal(msg.Data, &request); err == nil {
+			sl.handleServiceLookupRequest(&request, msg.ReceivedFrom)
+		}
+	case "service-response":
+		var response types.ServiceResponse
+		if err := json.Unmarshal(msg.Data, &response); err == nil {
+			sl.serviceManager.ProcessServiceResponse(&response)
+		}
+	default:
 		return
 	}
 
@@ -234,7 +257,7 @@ func (sl *ServiceLocator) handleServiceAnnouncement(announcement *types.ServiceA
 
 	// log.Printf("[LOCATOR] Received announcement from %s for service key %x (has_peer_id: %v)", from.String()[:8], expectedKey[:8], announcement.PeerID != "")
 	sl.serviceManager.eventSender(EventInfo, map[string]interface{}{
-		"message":     "Received service announcement for our service key",
+		"message":     fmt.Sprintf("[LOCATOR] Received announcement from %s for service key %x (has_peer_id: %v)", from.String()[:8], expectedKey[:8], announcement.PeerID != ""),
 		"from":        from.String(),
 		"service_key": fmt.Sprintf("%x", expectedKey[:8]),
 		"has_peer_id": announcement.PeerID != "",
@@ -260,17 +283,15 @@ func (sl *ServiceLocator) handleServiceAnnouncement(announcement *types.ServiceA
 
 	// Tag peer with this service key and connect if in lookup mode
 	if sl.mode == types.ServiceBeaconModeLookup {
-		// If we already have a connection item for this peer, append the service key; else add tracked peer
-		if announcement.PeerID != "" {
-			if peerID, err := peer.Decode(announcement.PeerID); err == nil {
-				if conn, ok := sl.serviceManager.connectionManager.GetConnectionInfo(peerID); ok && conn != nil {
-					// Append service key if not present
-					sl.serviceManager.connectionManager.AddTrackedPeer(peerID, types.NewServicePeerOptions(expectedKey, conn.HTTPCapable))
-				} else {
-					// Track new and try to connect via discovery
-					sl.serviceManager.connectionManager.AddTrackedPeer(peerID, types.NewServicePeerOptions(expectedKey, true))
-					sl.serviceManager.ConnectToServiceProvider(peerID)
-				}
+		if announcement.PeerID == "" {
+			return
+		}
+		if peerID, err := peer.Decode(announcement.PeerID); err == nil {
+			if conn, ok := sl.serviceManager.connectionManager.GetConnectionInfo(peerID); ok && conn != nil {
+				sl.serviceManager.connectionManager.AddTrackedPeer(peerID, types.NewServicePeerOptions(expectedKey, conn.HTTPCapable))
+			} else {
+				sl.serviceManager.connectionManager.AddTrackedPeer(peerID, types.NewServicePeerOptions(expectedKey, true))
+				sl.serviceManager.ConnectToServiceProvider(peerID)
 			}
 		}
 	}
@@ -456,6 +477,9 @@ type ServiceBeacon struct {
 	// Behavior flags
 	includePeerIDInAnnouncements   bool
 	onlyIncludePeerIDInDirectReply bool
+	// Piggyback: locator sharing this beacon's GossipSub subscription so both
+	// can operate on the same topic without a second Subscribe() call.
+	piggybackLocator *ServiceLocator
 }
 
 // Start begins periodic announcements and starts processing incoming lookup requests.
@@ -547,19 +571,31 @@ func (sb *ServiceBeacon) processMessages() {
 
 		// Process the message
 		sb.handleMessage(msg)
+
+		// Forward to piggybacked locator so it can handle announcements,
+		// responses, etc. on the same subscription.
+		if sb.piggybackLocator != nil {
+			sb.piggybackLocator.handleMessage(msg)
+		}
 	}
 }
 
-// handleMessage processes a single PubSub message
+// handleMessage processes a single PubSub message using type-based dispatch.
 func (sb *ServiceBeacon) handleMessage(msg *pubsub.Message) {
-	// Try to parse as ServiceLookupRequest
-	var request types.ServiceLookupRequest
-	if err := json.Unmarshal(msg.Data, &request); err == nil {
-		sb.handleServiceLookupRequest(&request, msg.ReceivedFrom)
+	var envelope struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(msg.Data, &envelope); err != nil {
 		return
 	}
 
-	// Unknown message type or not relevant to beacon
+	switch envelope.Type {
+	case "service-lookup":
+		var request types.ServiceLookupRequest
+		if err := json.Unmarshal(msg.Data, &request); err == nil {
+			sb.handleServiceLookupRequest(&request, msg.ReceivedFrom)
+		}
+	}
 }
 
 // handleServiceLookupRequest processes service lookup requests
@@ -1011,22 +1047,61 @@ func (m *Manager) StartServiceLocator(servicePubKey crypto.PubKey, mode types.Se
 
 	// Check if we already have a locator for this service
 	if _, exists := m.serviceLocators[topicName]; exists {
+		m.eventSender(EventInfo, map[string]interface{}{
+			"message":     "[LOCATOR] locator already exists, skipping",
+			"topic":       topicName,
+			"service_key": fmt.Sprintf("%x", servicePubKeyBytes[:8]),
+		})
 		return fmt.Errorf("service locator already exists for this service")
 	}
 
-	// Join the service topic
+	// Check if a beacon already owns this topic's subscription. GossipSub
+	// only allows one subscription per topic, so the locator piggybacks on
+	// the beacon's subscription and receives messages forwarded by it.
+	var ownerBeacon *ServiceBeacon
+	for _, b := range m.serviceBeacons {
+		bPubBytes, _ := crypto.MarshalPublicKey(b.ServicePrivKey.GetPublic())
+		bHash := sha256.Sum256(bPubBytes)
+		if fmt.Sprintf("service-%x", bHash[:8]) == topicName {
+			ownerBeacon = b
+			break
+		}
+	}
+
+	if ownerBeacon != nil {
+		m.eventSender(EventInfo, map[string]interface{}{
+			"message":     "Locator piggybacking on existing beacon subscription",
+			"topic":       topicName,
+			"service_key": fmt.Sprintf("%x", servicePubKeyBytes[:8]),
+		})
+
+		locator := &ServiceLocator{
+			serviceManager: m,
+			ServiceKey:     servicePubKey,
+			gossipTopic:    ownerBeacon.gossipTopic, // reuse beacon's topic for publishing
+			gossipSub:      nil,                     // no own subscription; beacon forwards messages
+			mode:           mode,
+			limit:          10,
+		}
+		m.serviceLocators[topicName] = locator
+		ownerBeacon.piggybackLocator = locator
+		return locator.Start()
+	}
+
+	// Normal path: no beacon owns this topic, create own subscription
 	serviceTopic, err := m.pubsub.Join(topicName)
 	if err != nil {
 		return fmt.Errorf("failed to join service topic: %w", err)
 	}
 
-	// Subscribe to the service topic
 	serviceSub, err := serviceTopic.Subscribe()
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to service topic: %w", err)
 	}
 
-	// log.Printf("[LOCATOR] Subscribed to topic %s", topicName)
+	m.eventSender(EventInfo, map[string]interface{}{
+		"message": fmt.Sprintf("[LOCATOR] Subscribed to topic %s", topicName),
+	})
 	m.eventSender(EventInfo, map[string]interface{}{
 		"message": "Locator subscribed to service topic",
 		"topic":   topicName,
@@ -1038,7 +1113,7 @@ func (m *Manager) StartServiceLocator(servicePubKey crypto.PubKey, mode types.Se
 		gossipTopic:    serviceTopic,
 		gossipSub:      serviceSub,
 		mode:           mode,
-		limit:          10, // Default limit of 10 services
+		limit:          10,
 	}
 
 	m.serviceLocators[topicName] = locator
@@ -1376,12 +1451,17 @@ func (m *Manager) ProcessServiceResponse(resp *types.ServiceResponse) {
 	}
 	// Connect using peer discovery or provided addresses
 	if pid, err := peer.Decode(peerIDStr); err == nil {
-		// If response includes addresses, use direct connection
 		if len(resp.Addresses) > 0 {
 			m.ConnectToServiceProviderDirectly(pid, resp.Addresses)
 		} else {
-			// Fall back to peer discovery
 			m.ConnectToServiceProvider(pid)
+		}
+
+		// Associate the service key from the response with this connection so that
+		// alias resolve (which filters by ServiceKeys) can find this peer immediately
+		// instead of waiting for a subsequent beacon announcement.
+		if len(resp.PublicKey) > 0 {
+			m.connectionManager.AddTrackedPeer(pid, types.NewServicePeerOptions(resp.PublicKey, true))
 		}
 	} else {
 		m.eventSender(EventError, map[string]interface{}{"message": "invalid responder peer id", "peer_id": peerIDStr})

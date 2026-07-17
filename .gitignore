@@ -36,6 +36,9 @@ __debug_bin*
 .DS_Store
 Thumbs.db
 
+# Archives (avoid accidentally committing large/personal archives)
+*.rar
+
 # Logs
 *.log
 
@@ -60,3 +63,13 @@ temp/
 # Local build artifacts
 apps/*/banyan
 apps/*/banyan-cli
+apps/node/proxy
+apps/chat-service/chat-service
+apps/chat-service/data/
+apps/chat-frontend/dist/
+
+# Generated topology (keep config, ignore output — contains private keys)
+apps/chat-service/topology/output/
+
+# Generated test-utils user nodes (contain private keys)
+test-utils/user-node/nodes/

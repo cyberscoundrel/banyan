@@ -1,0 +1,12 @@
+{
+  "listenAddr": ":8080",
+  "dataDir": "./data",
+  "nodeId": "12D3KooWExamplePeerID",
+  "hasStaticKey": true,
+  "hasLedgerKey": true,
+  "hasModKey": false,
+  "hasAdminKey": false,
+  "syncPeers": ["http://localhost:8081", "http://localhost:8082"],
+  "syncEnabled": true,
+  "syncInterval": "30s"
+}

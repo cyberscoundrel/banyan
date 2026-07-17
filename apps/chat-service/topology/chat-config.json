@@ -1,0 +1,138 @@
+{
+    "authorityKeys": [
+        "chat-authority"
+    ],
+    "nodes": [
+        {
+            "name": "chat-static-1",
+            "pk": "true",
+            "httpProxy": true,
+            "services": [
+                {
+                    "key": "chat-static-key",
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
+                }
+            ]
+        },
+        {
+            "name": "chat-ledger-1",
+            "pk": "true",
+            "httpProxy": true,
+            "services": [
+                {
+                    "key": "chat-static-key",
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
+                },
+                {
+                    "key": "chat-ledger-key",
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
+                }
+            ]
+        },
+        {
+            "name": "chat-ledger-2",
+            "pk": "true",
+            "httpProxy": true,
+            "services": [
+                {
+                    "key": "chat-static-key",
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
+                },
+                {
+                    "key": "chat-ledger-key",
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
+                }
+            ]
+        },
+        {
+            "name": "chat-mod-1",
+            "pk": "true",
+            "httpProxy": true,
+            "services": [
+                {
+                    "key": "chat-static-key",
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
+                },
+                {
+                    "key": "chat-ledger-key",
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
+                },
+                {
+                    "key": "chat-mod-key",
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
+                }
+            ]
+        },
+        {
+            "name": "chat-admin-1",
+            "pk": "true",
+            "httpProxy": true,
+            "services": [
+                {
+                    "key": "chat-static-key",
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
+                },
+                {
+                    "key": "chat-ledger-key",
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
+                },
+                {
+                    "key": "chat-mod-key",
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
+                },
+                {
+                    "key": "chat-admin-key",
+                    "figs": ["chat-fig"],
+                    "routeUrl": "http://127.0.0.1:8080",
+                    "keepFullPath": true
+                }
+            ]
+        }
+    ],
+    "figs": [
+        {
+            "name": "chat-fig",
+            "root": {
+                "path": "/",
+                "keys": ["chat-static-key"],
+                "children": [
+                    {
+                        "path": "/ledger",
+                        "keys": ["chat-ledger-key"]
+                    },
+                    {
+                        "path": "/mod",
+                        "keys": ["chat-mod-key"]
+                    },
+                    {
+                        "path": "/admin",
+                        "keys": ["chat-admin-key"]
+                    }
+                ]
+            },
+            "requiredSigners": ["chat-authority"]
+        }
+    ]
+}

@@ -27,10 +27,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"banyan/addon/sdk"
+
+	"github.com/gorilla/websocket"
 )
 
 var (
@@ -68,6 +72,7 @@ func main() {
 
 	// Start proxy server in background
 	go startProxyServer()
+	go startEventSubscriber()
 
 	// Register a status endpoint
 	mux := sdk.NewMux().WithLogger(nil)
@@ -185,7 +190,6 @@ func handleHTTPConnect(conn net.Conn, req *http.Request) {
 		}
 		defer target.Close()
 
-		conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 		relay(conn, target)
 	}
 }
@@ -207,11 +211,27 @@ func handleHTTPProxy(conn net.Conn, req *http.Request, reader *bufio.Reader) {
 
 	switch {
 	case isFigAddress(host):
-		handleFigHTTPRequest(conn, req, host)
+		if isWebSocketUpgrade(req) {
+			if strings.Contains(req.URL.RawQuery, "multisocket") {
+				handleFigMultisocketHTTP(conn, req, host, reader)
+			} else {
+				handleFigWebSocketTunnel(conn, req, host, reader)
+			}
+		} else {
+			handleFigHTTPRequest(conn, req, host)
+		}
 	case isSvcAddress(host):
-		handleSvcHTTPRequest(conn, req, host)
+		if isWebSocketUpgrade(req) {
+			handleSvcWebSocketTunnel(conn, req, host, reader)
+		} else {
+			handleSvcHTTPRequest(conn, req, host)
+		}
 	case isPeerAddress(host):
-		handlePeerHTTPRequest(conn, req, host)
+		if isWebSocketUpgrade(req) {
+			handlePeerWebSocketTunnel(conn, req, host, reader)
+		} else {
+			handlePeerHTTPRequest(conn, req, host)
+		}
 	default:
 		// Direct proxy to internet
 		proxyReq, err := http.NewRequest(req.Method, targetURL, req.Body)
@@ -231,6 +251,11 @@ func handleHTTPProxy(conn net.Conn, req *http.Request, reader *bufio.Reader) {
 
 		resp.Write(conn)
 	}
+}
+
+func isWebSocketUpgrade(req *http.Request) bool {
+	return strings.EqualFold(req.Header.Get("Connection"), "Upgrade") &&
+		strings.EqualFold(req.Header.Get("Upgrade"), "websocket")
 }
 
 func isFigAddress(host string) bool {
@@ -416,40 +441,39 @@ func extractPeerID(host string) string {
 }
 
 func handleFigTunnel(conn net.Conn, host string) {
-	// Parse host:port
 	parts := strings.Split(host, ":")
 	figHost := parts[0]
-	port := "443"
+	port := "8080"
 	if len(parts) > 1 {
 		port = parts[1]
 	}
 
 	alias := strings.TrimSuffix(figHost, ".fig")
 
-	// Resolve alias to peer via management API
-	peerID, err := resolveAliasToPeer(alias)
+	peerID, serviceKey, err := resolveAliasToPeerAndKey(alias)
 	if err != nil {
 		log.Printf("Failed to resolve alias %s: %v", alias, err)
 		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
 		return
 	}
 
-	// Open tunnel via management API
-	var portNum uint16
-	if _, err := fmt.Sscanf(port, "%d", &portNum); err != nil {
-		log.Printf("Invalid port number '%s': %v", port, err)
-		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
-		return
+	localPort, svcErr := openServiceTunnel(peerID, serviceKey)
+	if svcErr != nil {
+		log.Printf("Service tunnel failed for alias %s, falling back to port %s: %v", alias, port, svcErr)
+		var portNum uint16
+		if _, err := fmt.Sscanf(port, "%d", &portNum); err != nil {
+			log.Printf("Invalid port number '%s': %v", port, err)
+			conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
+			return
+		}
+		localPort, err = openTunnel(peerID, "localhost", portNum)
+		if err != nil {
+			log.Printf("Fallback tunnel failed for alias %s: %v", alias, err)
+			conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+			return
+		}
 	}
 
-	localPort, err := openTunnel(peerID, "localhost", portNum)
-	if err != nil {
-		log.Printf("Failed to open tunnel: %v", err)
-		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
-		return
-	}
-
-	// Connect to local tunnel endpoint
 	tunnelConn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
 	if err != nil {
 		log.Printf("Failed to connect to tunnel: %v", err)
@@ -458,28 +482,83 @@ func handleFigTunnel(conn net.Conn, host string) {
 	}
 	defer tunnelConn.Close()
 
+	log.Printf("Fig tunnel established for %s -> peer %s", alias, peerID)
+
 	conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 	relay(conn, tunnelConn)
 }
 
-func handleFigHTTPRequest(conn net.Conn, req *http.Request, host string) {
-	// For HTTP (not HTTPS) requests to .fig addresses
+func handleFigWebSocketTunnel(conn net.Conn, req *http.Request, host string, reader *bufio.Reader) {
 	parts := strings.Split(host, ":")
 	figHost := parts[0]
 	alias := strings.TrimSuffix(figHost, ".fig")
 
-	// Use the alias proxy endpoint
-	proxyURL := fmt.Sprintf("%s/proxy/alias/%s%s", managerURL, alias, req.URL.Path)
-	if req.URL.RawQuery != "" {
-		proxyURL += "?" + req.URL.RawQuery
+	peerID, serviceKey, err := resolveAliasToPeerAndKey(alias)
+	if err != nil {
+		log.Printf("Failed to resolve alias %s for WebSocket: %v", alias, err)
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
 	}
 
-	proxyReq, err := http.NewRequest(req.Method, proxyURL, req.Body)
+	localPort, err := openServiceTunnel(peerID, serviceKey)
+	if err != nil {
+		log.Printf("Service tunnel failed for alias %s: %v", alias, err)
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
+	}
+
+	tunnelConn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
+	if err != nil {
+		log.Printf("Failed to connect to WebSocket tunnel for alias %s: %v", alias, err)
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
+	}
+	defer tunnelConn.Close()
+
+	log.Printf("WebSocket tunnel established for %s -> peer %s", alias, peerID)
+
+	originalURL := req.URL
+	req.URL = &url.URL{Path: req.URL.Path, RawQuery: req.URL.RawQuery}
+	req.Write(tunnelConn)
+	req.URL = originalURL
+
+	relay(conn, tunnelConn)
+}
+
+func handleFigHTTPRequest(conn net.Conn, req *http.Request, host string) {
+	parts := strings.Split(host, ":")
+	figHost := parts[0]
+	alias := strings.TrimSuffix(figHost, ".fig")
+
+	peerID, err := resolveAliasToPeer(alias)
+	if err != nil {
+		log.Printf("Failed to discover alias %s: %v", alias, err)
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
+	}
+
+	log.Printf("Fig proxy: %s %s -> peer %s", req.Method, req.URL.Path, peerID)
+
+	var proxyPath string
+	isBroadcast := req.Header.Get("X-Banyan-Broadcast") == "true"
+	if isBroadcast {
+		proxyPath = fmt.Sprintf("%s/proxy/alias/broadcast/%s%s", managerURL, alias, req.URL.Path)
+	} else {
+		proxyPath = fmt.Sprintf("%s/proxy/alias/%s%s", managerURL, alias, req.URL.Path)
+	}
+	if req.URL.RawQuery != "" {
+		proxyPath += "?" + req.URL.RawQuery
+	}
+
+	proxyReq, err := http.NewRequest(req.Method, proxyPath, req.Body)
 	if err != nil {
 		conn.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"))
 		return
 	}
 	proxyReq.Header = req.Header
+	if isBroadcast {
+		proxyReq.Header.Del("X-Banyan-Broadcast")
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(proxyReq)
@@ -579,34 +658,145 @@ func handlePeerHTTPRequest(conn net.Conn, req *http.Request, host string) {
 	resp.Write(conn)
 }
 
+func handlePeerWebSocketTunnel(conn net.Conn, req *http.Request, host string, reader *bufio.Reader) {
+	parts := strings.Split(host, ":")
+	peerHost := parts[0]
+
+	peerInfo := parsePeerAddress(peerHost)
+
+	if err := ensurePeerConnected(peerInfo); err != nil {
+		log.Printf("Failed to connect to peer %s for WebSocket: %v", peerInfo.PeerID, err)
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
+	}
+
+	port := extractPortFromHost(host)
+	localPort, err := openTunnel(peerInfo.PeerID, "localhost", port)
+	if err != nil {
+		log.Printf("Failed to open WebSocket tunnel to peer %s: %v", peerInfo.PeerID, err)
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
+	}
+
+	tunnelConn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
+	if err != nil {
+		log.Printf("Failed to connect to WebSocket tunnel for peer %s: %v", peerInfo.PeerID, err)
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
+	}
+	defer tunnelConn.Close()
+
+	log.Printf("WebSocket tunnel established to peer %s", peerInfo.PeerID)
+
+	originalURL := req.URL
+	req.URL = &url.URL{Path: req.URL.Path, RawQuery: req.URL.RawQuery}
+	req.Write(tunnelConn)
+	req.URL = originalURL
+
+	relay(conn, tunnelConn)
+}
+
 // resolveAliasToPeer resolves a .fig alias to a peer ID via the management API.
 func resolveAliasToPeer(alias string) (string, error) {
-	// Call management API to resolve alias
-	resp, err := http.Get(fmt.Sprintf("%s/services/find?alias=%s", managerURL, url.QueryEscape(alias)))
+	peerID, _, err := resolveAliasToPeerAndKey(alias)
+	return peerID, err
+}
+
+// resolveAliasToPeerAndKey resolves a .fig alias to both a peer ID and service key.
+// It first ensures the alias is discovered via /services/find, then resolves
+// to a connected peer via /services/alias/resolve.
+func resolveAliasToPeerAndKey(alias string) (string, string, error) {
+	findBody, _ := json.Marshal(map[string]string{"alias": alias})
+	findResp, err := http.Post(managerURL+"/services/find", "application/json", bytes.NewReader(findBody))
 	if err != nil {
-		return "", fmt.Errorf("failed to call find service: %w", err)
+		return "", "", fmt.Errorf("failed to call find service: %w", err)
+	}
+	findResp.Body.Close()
+
+	if findResp.StatusCode != http.StatusOK && findResp.StatusCode != http.StatusAccepted {
+		return "", "", fmt.Errorf("find service failed with status %d", findResp.StatusCode)
+	}
+
+	if findResp.StatusCode == http.StatusAccepted {
+		time.Sleep(2 * time.Second)
+	}
+
+	resolveURL := fmt.Sprintf("%s/services/alias/resolve?alias=%s", managerURL, url.QueryEscape(alias))
+	for attempt := 0; attempt < 20; attempt++ {
+		resp, err := http.Get(resolveURL)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to call alias resolve: %w", err)
+		}
+
+		if resp.StatusCode == http.StatusOK {
+			var result struct {
+				PeerID     string `json:"peer_id"`
+				ServiceKey string `json:"service_key"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+				resp.Body.Close()
+				return "", "", fmt.Errorf("failed to decode alias resolve response: %w", err)
+			}
+			resp.Body.Close()
+
+			if result.PeerID != "" && result.ServiceKey != "" {
+				return result.PeerID, result.ServiceKey, nil
+			}
+			resp.Body.Close()
+		} else {
+			io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+		}
+
+		if attempt < 19 {
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	return "", "", fmt.Errorf("alias %s not resolved after retries", alias)
+}
+
+// openServiceTunnel opens a service-key-routed tunnel via the management API.
+func openServiceTunnel(peerID, serviceKey string) (int, error) {
+	reqBody, _ := json.Marshal(map[string]any{
+		"peer_id":     peerID,
+		"service_key": serviceKey,
+	})
+
+	resp, err := http.Post(
+		managerURL+"/tunnel/open-service",
+		"application/json",
+		bytes.NewReader(reqBody),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to call service tunnel open: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("find service failed: %s", string(body))
+		return 0, fmt.Errorf("service tunnel open failed: %s", string(body))
 	}
 
 	var result struct {
-		Peers []struct {
-			PeerID string `json:"peer_id"`
-		} `json:"peers"`
+		LocalPort int `json:"local_port"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
+		return 0, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	if len(result.Peers) == 0 {
-		return "", fmt.Errorf("no peers found for alias %s", alias)
-	}
+	return result.LocalPort, nil
+}
 
-	return result.Peers[0].PeerID, nil
+// extractPortFromHost parses the port from a Host header value.
+// Returns the port if present, or 80 for HTTP as default.
+func extractPortFromHost(host string) uint16 {
+	if idx := strings.LastIndex(host, ":"); idx != -1 {
+		if p, err := strconv.Atoi(host[idx+1:]); err == nil && p > 0 && p <= 65535 {
+			return uint16(p)
+		}
+	}
+	return 8080
 }
 
 // openTunnel requests a tunnel to a peer's service via the management API and returns the local port.
@@ -761,7 +951,55 @@ func ensurePeerConnected(peerInfo peerAddressInfo) error {
 	return nil
 }
 
-// relay bidirectionally copies data between two connections until one side closes.
+// connResponseWriter adapts a net.Conn to implement http.ResponseWriter + http.Hijacker
+// for use with websocket.Upgrader on raw TCP connections.
+type connResponseWriter struct {
+	conn   net.Conn
+	reader *bufio.Reader
+	header http.Header
+	wrote  bool
+}
+
+func (w *connResponseWriter) Header() http.Header {
+	if w.header == nil {
+		w.header = make(http.Header)
+	}
+	return w.header
+}
+
+func (w *connResponseWriter) Write(b []byte) (int, error) {
+	w.wrote = true
+	return w.conn.Write(b)
+}
+
+func (w *connResponseWriter) WriteHeader(code int) {
+	if w.wrote {
+		return
+	}
+	statusText := http.StatusText(code)
+	fmt.Fprintf(w.conn, "HTTP/1.1 %d %s\r\n", code, statusText)
+	for k, vv := range w.header {
+		for _, v := range vv {
+			fmt.Fprintf(w.conn, "%s: %s\r\n", k, v)
+		}
+	}
+	w.conn.Write([]byte("\r\n"))
+	w.wrote = true
+}
+
+func (w *connResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if w.reader != nil {
+		return w.conn, bufio.NewReadWriter(w.reader, bufio.NewWriter(w.conn)), nil
+	}
+	return w.conn, bufio.NewReadWriter(bufio.NewReader(w.conn), bufio.NewWriter(w.conn)), nil
+}
+
+func (w *connResponseWriter) Flush() {
+	if f, ok := w.conn.(interface{ Flush() error }); ok {
+		f.Flush()
+	}
+}
+
 func relay(c1, c2 net.Conn) {
 	done := make(chan struct{}, 2)
 	go func() {
@@ -773,6 +1011,455 @@ func relay(c1, c2 net.Conn) {
 		done <- struct{}{}
 	}()
 	<-done
+	c1.Close()
+	c2.Close()
+}
+
+// --- Multisocket (gorilla/websocket) ---
+
+type peerConn struct {
+	peerID string
+	ws     *websocket.Conn
+	mu     sync.Mutex
+	closed bool
+}
+
+func (pc *peerConn) close() {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+	if pc.closed {
+		return
+	}
+	pc.closed = true
+	pc.ws.Close()
+}
+
+func (pc *peerConn) send(data []byte) bool {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+	if pc.closed {
+		return false
+	}
+	pc.ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	err := pc.ws.WriteMessage(websocket.TextMessage, data)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func ensureLocatorsForAlias(alias string) {
+	findBody, _ := json.Marshal(map[string]string{"alias": alias})
+	resp, err := http.Post(managerURL+"/services/find", "application/json", bytes.NewReader(findBody))
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return
+	}
+
+	var result struct {
+		Results []struct {
+			ServiceKey     string `json:"service_key"`
+			ServiceKeyHash string `json:"service_key_hash"`
+			Status         string `json:"status"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return
+	}
+
+	for _, r := range result.Results {
+		if r.Status == "started" {
+			log.Printf("Multisocket: started locator for key %s", r.ServiceKeyHash)
+		}
+	}
+}
+
+func ensureLocatorsRunning(serviceKeys []string) {
+	for _, keyHex := range serviceKeys {
+		body, _ := json.Marshal(map[string]string{"compressedPublicKey": keyHex})
+		resp, err := http.Post(managerURL+"/services/locator/start", "application/json", bytes.NewReader(body))
+		if err != nil {
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			log.Printf("Multisocket: started locator for key %s", keyHex[:16]+"...")
+		}
+	}
+}
+
+func resolveAliasToAllPeers(alias string, path string) ([]struct {
+	PeerID     string `json:"peer_id"`
+	ServiceKey string `json:"service_key"`
+}, error) {
+	findBody, _ := json.Marshal(map[string]string{"alias": alias})
+	findResp, err := http.Post(managerURL+"/services/find", "application/json", bytes.NewReader(findBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to call find service: %w", err)
+	}
+	findResp.Body.Close()
+
+	if findResp.StatusCode != http.StatusOK && findResp.StatusCode != http.StatusAccepted {
+		return nil, fmt.Errorf("find service failed with status %d", findResp.StatusCode)
+	}
+
+	if findResp.StatusCode == http.StatusAccepted {
+		time.Sleep(2 * time.Second)
+	}
+
+	resolveURL := fmt.Sprintf("%s/services/alias/resolve?alias=%s&all=true&path=%s", managerURL, url.QueryEscape(alias), url.QueryEscape(path))
+	for attempt := 0; attempt < 20; attempt++ {
+		resp, err := http.Get(resolveURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to call alias resolve: %w", err)
+		}
+
+		if resp.StatusCode == http.StatusOK {
+			var result struct {
+				Peers []struct {
+					PeerID     string `json:"peer_id"`
+					ServiceKey string `json:"service_key"`
+				} `json:"peers"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+				resp.Body.Close()
+				return nil, fmt.Errorf("failed to decode alias resolve response: %w", err)
+			}
+			resp.Body.Close()
+
+			if len(result.Peers) > 0 {
+				return result.Peers, nil
+			}
+			resp.Body.Close()
+		} else {
+			io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+		}
+
+		if attempt < 19 {
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	return nil, fmt.Errorf("alias %s not resolved to any peers after retries", alias)
+}
+
+var multisocketUpgrader = websocket.Upgrader{
+	ReadBufferSize:  4096,
+	WriteBufferSize: 4096,
+	CheckOrigin:     func(r *http.Request) bool { return true },
+}
+
+func handleFigMultisocketHTTP(conn net.Conn, req *http.Request, host string, reader *bufio.Reader) {
+	parts := strings.Split(host, ":")
+	figHost := parts[0]
+	alias := strings.TrimSuffix(figHost, ".fig")
+
+	peers, err := resolveAliasToAllPeers(alias, req.URL.Path)
+	if err != nil {
+		log.Printf("Multisocket: failed to resolve alias %s: %v", alias, err)
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
+	}
+
+	log.Printf("Multisocket: starting for %s with %d peers", alias, len(peers))
+
+	ensureLocatorsForAlias(alias)
+
+	clientWS, err := multisocketUpgrader.Upgrade(&connResponseWriter{conn: conn, reader: reader}, req, nil)
+	if err != nil {
+		log.Printf("Multisocket: failed to upgrade client connection: %v", err)
+		return
+	}
+
+	pool := &multisocketPool{
+		alias:      alias,
+		clientWS:   clientWS,
+		peers:      make(map[string]*peerConn),
+		upgradeReq: req,
+	}
+
+	for _, p := range peers {
+		pc := pool.addPeer(p.PeerID, p.ServiceKey)
+		if pc != nil {
+			go pool.peerReadLoop(pc)
+		}
+	}
+
+	registerMultisocketPool(pool)
+	defer unregisterMultisocketPool(pool)
+
+	go pool.reResolveLoop()
+	pool.clientReadLoop()
+}
+
+type multisocketPool struct {
+	alias      string
+	clientWS   *websocket.Conn
+	peers      map[string]*peerConn
+	mu         sync.RWMutex
+	wg         sync.WaitGroup
+	upgradeReq *http.Request
+	closed     bool
+}
+
+func (p *multisocketPool) addPeer(peerID, serviceKey string) *peerConn {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.closed {
+		return nil
+	}
+	if _, exists := p.peers[peerID]; exists {
+		return nil
+	}
+
+	localPort, err := openServiceTunnel(peerID, serviceKey)
+	if err != nil {
+		log.Printf("Multisocket: service tunnel failed for peer %s: %v", peerID, err)
+		return nil
+	}
+
+	tunnelConn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
+	if err != nil {
+		log.Printf("Multisocket: failed to connect to tunnel for peer %s: %v", peerID, err)
+		return nil
+	}
+
+	wsURL, _ := url.Parse(fmt.Sprintf("ws://%s%s", p.upgradeReq.Host, p.upgradeReq.URL.RequestURI()))
+	wsConn, _, err := websocket.NewClient(tunnelConn, wsURL, nil, 4096, 4096)
+	if err != nil {
+		log.Printf("Multisocket: WebSocket handshake failed with peer %s: %v", peerID, err)
+		tunnelConn.Close()
+		return nil
+	}
+
+	pc := &peerConn{
+		peerID: peerID,
+		ws:     wsConn,
+	}
+	p.peers[peerID] = pc
+
+	log.Printf("Multisocket: connected to peer %s", peerID)
+	return pc
+}
+
+func (p *multisocketPool) peerReadLoop(pc *peerConn) {
+	defer func() {
+		p.mu.Lock()
+		delete(p.peers, pc.peerID)
+		p.mu.Unlock()
+		pc.close()
+		log.Printf("Multisocket: peer %s disconnected", pc.peerID)
+	}()
+
+	for {
+		_, msg, err := pc.ws.ReadMessage()
+		if err != nil {
+			return
+		}
+
+		envelope := fmt.Sprintf(`{"p":"%s","d":%s}`, pc.peerID, string(msg))
+		p.mu.RLock()
+		if !p.closed {
+			p.clientWS.WriteMessage(websocket.TextMessage, []byte(envelope))
+		}
+		p.mu.RUnlock()
+	}
+}
+
+func (p *multisocketPool) clientReadLoop() {
+	defer func() {
+		p.mu.Lock()
+		p.closed = true
+		for _, pc := range p.peers {
+			pc.close()
+		}
+		p.mu.Unlock()
+		p.clientWS.Close()
+	}()
+
+	for {
+		_, msg, err := p.clientWS.ReadMessage()
+		if err != nil {
+			return
+		}
+
+		var targetPeer string
+		var blacklist map[string]bool
+		var payload []byte = msg
+
+		var parsed struct {
+			To  string          `json:"to"`
+			Not []string        `json:"not"`
+			D   json.RawMessage `json:"d"`
+		}
+		if json.Unmarshal(msg, &parsed) == nil {
+			if parsed.D != nil {
+				payload = parsed.D
+			}
+			if parsed.To != "" {
+				targetPeer = parsed.To
+			}
+			if len(parsed.Not) > 0 {
+				blacklist = make(map[string]bool)
+				for _, id := range parsed.Not {
+					blacklist[id] = true
+				}
+			}
+		}
+
+		p.mu.RLock()
+		if targetPeer != "" {
+			if pc, ok := p.peers[targetPeer]; ok {
+				pc.send(payload)
+			}
+		} else {
+			for id, pc := range p.peers {
+				if blacklist != nil && blacklist[id] {
+					continue
+				}
+				pc.send(payload)
+			}
+		}
+		p.mu.RUnlock()
+	}
+}
+
+func (p *multisocketPool) reResolve() {
+	peers, err := resolveAliasToAllPeers(p.alias, p.upgradeReq.URL.Path)
+	if err != nil {
+		return
+	}
+
+	existing := make(map[string]bool)
+	p.mu.RLock()
+	for id := range p.peers {
+		existing[id] = true
+	}
+	p.mu.RUnlock()
+
+	for _, peer := range peers {
+		if existing[peer.PeerID] {
+			continue
+		}
+		pc := p.addPeer(peer.PeerID, peer.ServiceKey)
+		if pc != nil {
+			log.Printf("Multisocket [%s]: re-resolve added peer %s", p.alias, peer.PeerID)
+			go p.peerReadLoop(pc)
+		}
+	}
+}
+
+func (p *multisocketPool) reResolveLoop() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		p.mu.RLock()
+		if p.closed {
+			p.mu.RUnlock()
+			return
+		}
+		p.mu.RUnlock()
+
+		p.reResolve()
+	}
+}
+
+var (
+	multisocketRegistry   []*multisocketPool
+	multisocketRegistryMu sync.RWMutex
+)
+
+func registerMultisocketPool(p *multisocketPool) {
+	multisocketRegistryMu.Lock()
+	defer multisocketRegistryMu.Unlock()
+	multisocketRegistry = append(multisocketRegistry, p)
+}
+
+func unregisterMultisocketPool(p *multisocketPool) {
+	multisocketRegistryMu.Lock()
+	defer multisocketRegistryMu.Unlock()
+	for i, pp := range multisocketRegistry {
+		if pp == p {
+			multisocketRegistry = append(multisocketRegistry[:i], multisocketRegistry[i+1:]...)
+			return
+		}
+	}
+}
+
+func triggerReResolveAll() {
+	multisocketRegistryMu.RLock()
+	pools := make([]*multisocketPool, len(multisocketRegistry))
+	copy(pools, multisocketRegistry)
+	multisocketRegistryMu.RUnlock()
+
+	for _, p := range pools {
+		p.mu.RLock()
+		closed := p.closed
+		p.mu.RUnlock()
+		if !closed {
+			go p.reResolve()
+		}
+	}
+}
+
+func startEventSubscriber() {
+	mgmtURL, err := url.Parse(managerURL)
+	if err != nil {
+		log.Printf("Event subscriber: invalid manager URL: %v", err)
+		return
+	}
+	eventsURL := fmt.Sprintf("ws://%s/events/subscribe", mgmtURL.Host)
+
+	for {
+		func() {
+			wsConn, _, err := websocket.DefaultDialer.Dial(eventsURL, nil)
+			if err != nil {
+				log.Printf("Event subscriber: failed to connect, retrying in 10s: %v", err)
+				time.Sleep(10 * time.Second)
+				return
+			}
+			defer wsConn.Close()
+			log.Printf("Event subscriber: connected to %s", eventsURL)
+
+			for {
+				_, msg, err := wsConn.ReadMessage()
+				if err != nil {
+					log.Printf("Event subscriber: disconnected, retrying in 5s: %v", err)
+					time.Sleep(5 * time.Second)
+					return
+				}
+
+				var event struct {
+					Type string `json:"type"`
+					Data struct {
+						Message string `json:"message"`
+						PeerID  string `json:"peer_id"`
+					} `json:"data"`
+				}
+				if json.Unmarshal(msg, &event) != nil {
+					continue
+				}
+
+				if event.Type == "connection" {
+					multisocketRegistryMu.RLock()
+					count := len(multisocketRegistry)
+					multisocketRegistryMu.RUnlock()
+					if count > 0 {
+						log.Printf("Event subscriber: connection event (peer=%s), triggering re-resolve for %d pools",
+							event.Data.PeerID, count)
+						triggerReResolveAll()
+					}
+				}
+			}
+		}()
+	}
 }
 
 // handleSOCKS5 processes a SOCKS5 connection request after protocol detection.
@@ -864,7 +1551,7 @@ func handleSOCKS5(conn net.Conn) {
 }
 
 func handleSOCKS5Direct(conn net.Conn, host string, port uint16) {
-	target, err := net.Dial("tcp", fmt.Sprintf("%s:%d", host, port))
+	target, err := net.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(int(port))))
 	if err != nil {
 		conn.Write([]byte{0x05, 0x04, 0x00, 0x01, 0, 0, 0, 0, 0, 0}) // Host unreachable
 		return
@@ -1039,22 +1726,73 @@ func handleSvcTunnel(conn net.Conn, host string) {
 	relay(conn, tunnelConn)
 }
 
+func handleSvcWebSocketTunnel(conn net.Conn, req *http.Request, host string, reader *bufio.Reader) {
+	parts := strings.Split(host, ":")
+	svcHost := parts[0]
+	prefix := strings.TrimSuffix(svcHost, ".svc")
+
+	peerID, serviceKey, err := resolveServiceKeyPrefix(prefix)
+	if err != nil {
+		log.Printf("Failed to resolve service key prefix %s for WebSocket: %v", prefix, err)
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
+	}
+
+	localPort, svcErr := openServiceTunnel(peerID, serviceKey)
+	if svcErr != nil {
+		log.Printf("Service tunnel failed for svc %s, falling back to port: %v", prefix, svcErr)
+		port := extractPortFromHost(host)
+		localPort, err = openTunnel(peerID, "localhost", port)
+		if err != nil {
+			log.Printf("Fallback tunnel also failed for svc %s: %v", prefix, err)
+			conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+			return
+		}
+	}
+
+	tunnelConn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
+	if err != nil {
+		log.Printf("Failed to connect to WebSocket tunnel for svc %s: %v", prefix, err)
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
+	}
+	defer tunnelConn.Close()
+
+	log.Printf("WebSocket tunnel established for svc %s -> peer %s", prefix, peerID)
+
+	originalURL := req.URL
+	req.URL = &url.URL{Path: req.URL.Path, RawQuery: req.URL.RawQuery}
+	req.Write(tunnelConn)
+	req.URL = originalURL
+
+	relay(conn, tunnelConn)
+}
+
 func handleSvcHTTPRequest(conn net.Conn, req *http.Request, host string) {
 	parts := strings.Split(host, ":")
 	svcHost := parts[0]
 	prefix := strings.TrimSuffix(svcHost, ".svc")
 
-	proxyURL := fmt.Sprintf("%s/proxy/service-key/%s%s", managerURL, prefix, req.URL.Path)
+	isBroadcast := req.Header.Get("X-Banyan-Broadcast") == "true"
+	var proxyPath string
+	if isBroadcast {
+		proxyPath = fmt.Sprintf("%s/proxy/service-key/broadcast/%s%s", managerURL, prefix, req.URL.Path)
+	} else {
+		proxyPath = fmt.Sprintf("%s/proxy/service-key/%s%s", managerURL, prefix, req.URL.Path)
+	}
 	if req.URL.RawQuery != "" {
-		proxyURL += "?" + req.URL.RawQuery
+		proxyPath += "?" + req.URL.RawQuery
 	}
 
-	proxyReq, err := http.NewRequest(req.Method, proxyURL, req.Body)
+	proxyReq, err := http.NewRequest(req.Method, proxyPath, req.Body)
 	if err != nil {
 		conn.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"))
 		return
 	}
 	proxyReq.Header = req.Header
+	if isBroadcast {
+		proxyReq.Header.Del("X-Banyan-Broadcast")
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(proxyReq)

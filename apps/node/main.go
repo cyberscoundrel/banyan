@@ -111,6 +111,10 @@ type NodeConfigFile struct {
 	TunnelAllowedTargets []string `json:"tunnelAllowedTargets,omitempty"`
 	// AllowUnsafeServiceKeyInjection allows manual service key injection via API (SECURITY RISK).
 	AllowUnsafeServiceKeyInjection *bool `json:"allowUnsafeServiceKeyInjection,omitempty"`
+	// DataDir is the directory for durable node state (persistence tree).
+	DataDir *string `json:"dataDir,omitempty"`
+	// PeerstoreDSN selects an external SQL backend for the persistence tree.
+	PeerstoreDSN *string `json:"peerstoreDsn,omitempty"`
 }
 
 // Command line flags for node configuration.
@@ -142,6 +146,9 @@ var (
 	tunnelAuthToken = flag.String("tunnel-auth-token", "", "Auth token required for tunnel API endpoints (optional)")
 	// Unsafe testing flags
 	allowUnsafeServiceKeyInjection = flag.Bool("allow-unsafe-service-key-injection", false, "Allow manual injection of service keys via API (SECURITY RISK - for testing only)")
+	// Persistence tree flags
+	dataDir      = flag.String("data-dir", "", "Directory for durable node state such as the peer persistence tree (overrides default ./data relative to executable)")
+	peerstoreDSN = flag.String("peerstore-dsn", "", "DSN for an external SQL persistence-tree backend (unset uses the embedded SQLite store under --data-dir)")
 )
 
 // main is the entry point for the Banyan node.
@@ -388,6 +395,8 @@ func loadConfig() (*nodePkg.Config, error) {
 		TunnelAuthToken:                 stringValue(tunnelAuthToken, fileConfig.TunnelAuthToken),
 		TunnelAllowedTargets:            fileConfig.TunnelAllowedTargets, // Can only be set via config file
 		AllowUnsafeServiceKeyInjection:  boolValue("allow-unsafe-service-key-injection", allowUnsafeServiceKeyInjection, fileConfig.AllowUnsafeServiceKeyInjection, false),
+		DataDir:                         stringValue(dataDir, fileConfig.DataDir),
+		PeerstoreDSN:                    stringValue(peerstoreDSN, fileConfig.PeerstoreDSN),
 	}
 
 	// Handle addonsDir separately since it's not part of node.Config

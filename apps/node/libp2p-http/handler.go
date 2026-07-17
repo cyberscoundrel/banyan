@@ -17,6 +17,7 @@ package libp2phttp
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -32,7 +33,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 
+	"banyan/attest"
 	"banyan/interfaces"
+	"banyan/peerstore"
 	"banyan/types"
 )
 
@@ -51,14 +54,16 @@ type Handler struct {
 	mux                     *http.ServeMux
 	addonDisclosureProvider func() []types.AddonDisclosure
 	noCrypto                bool
+	peerStore               peerstore.PeerStore
 }
 
 // NewHandler creates a new Handler instance with the provided dependencies.
 // The handler requires a libp2p host, context, HTTP transport, connection manager,
 // service manager, crypto manager, event broadcaster, and route table to function.
-// If noCrypto is true, plaintext communication is allowed for testing purposes.
+// The peerStore may be nil (persistence disabled). If noCrypto is true,
+// plaintext communication is allowed for testing purposes.
 func NewHandler(host host.Host, ctx context.Context, httpTransport *http.Transport,
-	connectionManager interfaces.PeerManager, serviceManager interfaces.ServiceManager, cryptoManager interfaces.CryptoManager, eventBroadcaster interfaces.EventBroadcaster, routeTable *types.RouteTable, noCrypto bool) interfaces.HTTPHandler {
+	connectionManager interfaces.PeerManager, serviceManager interfaces.ServiceManager, cryptoManager interfaces.CryptoManager, eventBroadcaster interfaces.EventBroadcaster, routeTable *types.RouteTable, noCrypto bool, peerStore peerstore.PeerStore) interfaces.HTTPHandler {
 	return &Handler{
 		host:              host,
 		ctx:               ctx,
@@ -69,6 +74,7 @@ func NewHandler(host host.Host, ctx context.Context, httpTransport *http.Transpo
 		cryptoManager:     cryptoManager,
 		routeTable:        routeTable,
 		noCrypto:          noCrypto,
+		peerStore:         peerStore,
 	}
 }
 
@@ -121,6 +127,7 @@ func (h *Handler) StartP2PProtocolServer() {
 	libp2pMux.HandleFunc("/connections", h.HandleConnectionsStatus)
 	libp2pMux.HandleFunc("/services/figs", h.HandleServiceFigs)
 	libp2pMux.HandleFunc("/services/fig/", h.HandleServiceFigByKey)
+	libp2pMux.HandleFunc("/peerstore/", h.HandlePeerstoreByKey)
 
 	server := &http.Server{
 		Handler: libp2pMux,
@@ -935,6 +942,12 @@ func (h *Handler) HandleLibp2pHTTPProxy(w http.ResponseWriter, r *http.Request) 
 		proxyReq.Header[k] = v
 	}
 
+	// Inject the requesting peer's identity so downstream services can
+	// authenticate the caller via the P2P network.
+	if peerID := h.inferPeerIDFromRequest(r); peerID != "" {
+		proxyReq.Header.Set("X-Peer-Id", peerID)
+	}
+
 	// Make the request using our transport
 	client := &http.Client{Transport: h.httpTransport}
 	resp, err := client.Do(proxyReq)
@@ -958,12 +971,6 @@ func (h *Handler) HandleLibp2pHTTPProxy(w http.ResponseWriter, r *http.Request) 
 			"error":   err.Error(),
 		})
 	}
-
-	h.sendEvent(types.EventProxyRequest, map[string]interface{}{
-		"target": targetURL,
-		"method": r.Method,
-		"status": resp.StatusCode,
-	})
 }
 
 // HandleRouter forwards HTTP requests to configured backend URLs based on route identifiers.
@@ -1053,6 +1060,12 @@ func (h *Handler) HandleRouter(w http.ResponseWriter, r *http.Request) {
 		proxyReq.Header[k] = v
 	}
 
+	// Inject the requesting peer's identity so downstream services can
+	// authenticate the caller via the P2P network.
+	if peerID := h.inferPeerIDFromRequest(r); peerID != "" {
+		proxyReq.Header.Set("X-Peer-Id", peerID)
+	}
+
 	// Make the request using our transport
 	client := &http.Client{Transport: h.httpTransport}
 	resp, err := client.Do(proxyReq)
@@ -1083,4 +1096,93 @@ func (h *Handler) HandleRouter(w http.ResponseWriter, r *http.Request) {
 		"method":     r.Method,
 		"status":     resp.StatusCode,
 	})
+}
+
+// Peer-exchange (PEX) tuning for the libp2p /peerstore/<serviceKeyHex> endpoint.
+const (
+	// peerstorePEXCap bounds how many entries a single PEX response returns.
+	peerstorePEXCap = 32
+	// peerstorePEXTTLSeconds is advertised to callers as the freshness window.
+	peerstorePEXTTLSeconds = 3600
+)
+
+// pexEntry is one shared, attested peer observation.
+type pexEntry struct {
+	Subject     string   `json:"subject"`
+	Addrs       []string `json:"addrs"`
+	ObservedAt  int64    `json:"observedAt"`
+	Attestation string   `json:"attestation"` // base64 of the signed attestation
+}
+
+// pexResponse is the body returned by GET /peerstore/<serviceKeyHex>.
+type pexResponse struct {
+	ServiceKey string     `json:"serviceKey"`
+	Entries    []pexEntry `json:"entries"`
+	TTL        int        `json:"ttl"`
+}
+
+// HandlePeerstoreByKey serves this node's own HTTP-verified, attested peer
+// observations for a service key to a connected peer (fig-scoped PEX). It only
+// shares subjects it has itself verified and signed for, so it can never relay
+// arbitrary sybils it merely heard about; the caller must still independently
+// dial and HTTP-verify before treating any subject as routable
+// (verify-before-trust). Privacy note: this iteration is open to any connected
+// peer; a fig-membership challenge can be layered here later without changing
+// the wire format.
+func (h *Handler) HandlePeerstoreByKey(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.peerStore == nil {
+		http.Error(w, "persistence tree disabled", http.StatusServiceUnavailable)
+		return
+	}
+
+	keyHex := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/peerstore/"))
+	if keyHex == "" {
+		http.Error(w, "missing service key", http.StatusBadRequest)
+		return
+	}
+	keyBytes, err := hex.DecodeString(keyHex)
+	if err != nil {
+		http.Error(w, "invalid service key hex", http.StatusBadRequest)
+		return
+	}
+	if _, err := crypto.UnmarshalPublicKey(keyBytes); err != nil {
+		http.Error(w, "invalid service key", http.StatusBadRequest)
+		return
+	}
+
+	entries, err := h.peerStore.ForServiceKey(h.ctx, keyHex, peerstorePEXCap)
+	if err != nil {
+		http.Error(w, "peerstore query failed", http.StatusInternalServerError)
+		return
+	}
+
+	self := h.host.ID().String()
+	resp := pexResponse{ServiceKey: keyHex, TTL: peerstorePEXTTLSeconds}
+	for _, e := range entries {
+		// Share only our own, actually-verified observations that carry a valid
+		// attestation. Unverified hearsay is never re-shared.
+		if e.Observer != self || e.LastSuccess == nil || len(e.Attestation) == 0 {
+			continue
+		}
+		att, uerr := attest.Unmarshal(e.Attestation)
+		if uerr != nil {
+			continue
+		}
+		if ok, _ := att.Verify(); !ok {
+			continue
+		}
+		resp.Entries = append(resp.Entries, pexEntry{
+			Subject:     e.PeerID,
+			Addrs:       e.Multiaddrs,
+			ObservedAt:  att.Claim.ObservedAt,
+			Attestation: base64.StdEncoding.EncodeToString(e.Attestation),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
 }

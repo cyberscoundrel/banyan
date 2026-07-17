@@ -1,0 +1,72 @@
+{
+  "name": "chat-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/chat-service/src",
+  "tags": ["type:app", "lang:typescript"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "inputs": ["typescript"],
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/chat-service",
+        "command": "tsc"
+      }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/chat-service",
+        "command": "nodemon --exec ts-node --esm src/index.ts"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "cwd": "apps/chat-service",
+        "command": "node dist/index.js"
+      }
+    },
+    "topology": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["topology-gen:build", "node:build"],
+      "inputs": ["{projectRoot}/topology/chat-config.json"],
+      "outputs": ["{projectRoot}/topology/output"],
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "./dist/apps/topology-gen/generator apps/chat-service/topology/chat-config.json apps/chat-service/topology/output --banyan-path=../../../../../dist/apps/node"
+      },
+      "configurations": {
+        "windows": {
+          "command": "powershell -Command \"& .\\dist\\apps\\topology-gen\\generator.exe apps\\chat-service\\topology\\chat-config.json apps\\chat-service\\topology\\output --banyan-path=../../../../../dist/apps/node\""
+        }
+      }
+    },
+    "docker:build": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["chat-frontend:build"],
+      "inputs": ["typescript", "{workspaceRoot}/apps/node/**/*.go", "{projectRoot}/docker/Dockerfile.banyan"],
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "docker build -f apps/chat-service/docker/Dockerfile.banyan -t banyan-node:latest ."
+      }
+    },
+    "docker:up": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["docker:build", "topology"],
+      "options": {
+        "cwd": "apps/chat-service/docker",
+        "command": "docker compose -f docker-compose.banyan.yml up -d"
+      }
+    },
+    "docker:down": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/chat-service/docker",
+        "command": "docker compose -f docker-compose.banyan.yml down"
+      }
+    }
+  }
+}

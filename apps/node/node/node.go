@@ -41,6 +41,7 @@ import (
 	eventsPkg "banyan/events"
 	"banyan/interfaces"
 	httpPkg "banyan/libp2p-http"
+	"banyan/peerstore"
 	servicePkg "banyan/service"
 	tunnelPkg "banyan/tunnel"
 	"banyan/types"
@@ -100,6 +101,12 @@ type Config struct {
 	TunnelAllowedTargets []string
 	// AllowUnsafeServiceKeyInjection allows manual service key injection via API (security risk, for testing only).
 	AllowUnsafeServiceKeyInjection *bool
+	// DataDir is the directory for durable node state (e.g. the persistence
+	// tree). Defaults to ./data relative to the executable when empty.
+	DataDir *string
+	// PeerstoreDSN, when set, selects an external SQL backend for the
+	// persistence tree. Unset uses the embedded SQLite store under DataDir.
+	PeerstoreDSN *string
 }
 
 // Node represents a Banyan libp2p node with HTTP proxy capabilities.
@@ -144,6 +151,10 @@ type Node struct {
 
 	// key loader for services
 	keyLoader PrivateKeyLoader
+
+	// peerStore is the durable, service-key-scoped persistence tree. It may be
+	// nil if the store failed to open (persistence disabled, node still runs).
+	peerStore peerstore.PeerStore
 }
 
 // PrivateKeyLoader is a function type for loading private keys from PEM files.
@@ -352,8 +363,12 @@ func NewNode(ctx context.Context, config *Config, keyLoader PrivateKeyLoader) (*
 	// Initialize event broadcaster first - create a real broadcaster for the managers
 	node.eventBroadcaster = eventsPkg.NewBroadcaster(h.ID().String())
 
+	// Open the durable persistence tree. A failure here is non-fatal: the node
+	// still runs, it just won't warm-dial or persist observed peers.
+	node.peerStore = openPeerStore(config, h.ID().String())
+
 	// Initialize managers with interfaces
-	node.connectionManager = connectionPkg.NewManager(h, ctx, httpTransport, kademliaDHT, topic, node.eventBroadcaster)
+	node.connectionManager = connectionPkg.NewManager(h, ctx, httpTransport, kademliaDHT, topic, node.eventBroadcaster, node.peerStore)
 
 	// Create crypto manager (no default service key; per-service keys will be loaded later)
 	node.cryptoManager = cryptoPkg.NewManager(h, nil)
@@ -372,13 +387,16 @@ func NewNode(ctx context.Context, config *Config, keyLoader PrivateKeyLoader) (*
 	node.serviceManager = servicePkg.NewManager(h, ctx, ps, node.cryptoManager, node.connectionManager, httpTransport, eventSenderFunc, noCrypto, includePeerID, peerIDDirectOnly, overrideTransport)
 
 	// Create HTTP handler
-	node.httpHandler = httpPkg.NewHandler(h, ctx, httpTransport, node.connectionManager, node.serviceManager, node.cryptoManager, node.eventBroadcaster, routeTable, noCrypto)
+	node.httpHandler = httpPkg.NewHandler(h, ctx, httpTransport, node.connectionManager, node.serviceManager, node.cryptoManager, node.eventBroadcaster, routeTable, noCrypto, node.peerStore)
 
 	// Create TCP tunnel handler for peer-to-peer TCP tunneling (if enabled)
 	tunnelEnabled := config.TunnelEnabled == nil || *config.TunnelEnabled
 	if tunnelEnabled {
 		node.tunnelHandler = tunnelPkg.NewHandler(h, ctx, func(format string, v ...interface{}) {
 			fmt.Printf("[tunnel] "+format+"\n", v...)
+		})
+		node.tunnelHandler.SetRouteLookup(func(identifier string) (string, bool) {
+			return routeTable.GetRoute(identifier)
 		})
 		// Set allowed targets from config
 		if len(config.TunnelAllowedTargets) > 0 {
@@ -483,6 +501,13 @@ func (n *Node) Start() error {
 		return err
 	}
 
+	// Warm up from the durable persistence tree and keep known service peers
+	// connected. Both are non-blocking so startup never waits on disk or dials.
+	if n.peerStore != nil {
+		go n.warmDialPersistedPeers()
+		go n.runPeerStoreMaintenance()
+	}
+
 	n.SendEvent("node_started", map[string]interface{}{
 		"peer_id":   n.host.ID().String(),
 		"timestamp": time.Now(),
@@ -500,6 +525,9 @@ func (n *Node) Close() {
 	}
 	if n.httpListener != nil {
 		n.httpListener.Close()
+	}
+	if n.peerStore != nil {
+		_ = n.peerStore.Close()
 	}
 	n.host.Close()
 }
@@ -648,6 +676,41 @@ func (n *Node) GetDiscoveryManager() interfaces.DiscoveryManager {
 // GetHTTPTransport returns the HTTP transport configured for libp2p URLs.
 func (n *Node) GetHTTPTransport() *http.Transport {
 	return n.httpTransport
+}
+
+// GetPeerStore returns the durable persistence tree, or nil if it failed to
+// open (persistence disabled).
+func (n *Node) GetPeerStore() peerstore.PeerStore {
+	return n.peerStore
+}
+
+// openPeerStore opens the durable persistence tree from config, resolving the
+// default data dir (./data next to the executable) when unset. On failure it
+// logs and returns nil; the node then runs without persistence.
+func openPeerStore(config *Config, selfID string) peerstore.PeerStore {
+	dsn := ""
+	if config.PeerstoreDSN != nil {
+		dsn = *config.PeerstoreDSN
+	}
+	dataDir := ""
+	if config.DataDir != nil {
+		dataDir = *config.DataDir
+	}
+	if dataDir == "" {
+		if exe, err := os.Executable(); err == nil {
+			dataDir = filepath.Join(filepath.Dir(exe), "data")
+		} else {
+			dataDir = "data"
+		}
+	}
+	dbPath := filepath.Join(dataDir, "peerstore.db")
+	store, err := peerstore.Open(peerstore.Config{DSN: dsn, Path: dbPath, Observer: selfID})
+	if err != nil {
+		fmt.Printf("WARNING: persistence tree disabled: %v\n", err)
+		return nil
+	}
+	fmt.Printf("Persistence tree ready at %s\n", dbPath)
+	return store
 }
 
 // SetHTTPServer sets the HTTP server for event broadcasting.
