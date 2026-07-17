@@ -81,12 +81,14 @@ services:
       - ../topology/output/nodes/chat-static-1/addons:/app/addons:ro
       - ../topology/output/nodes/chat-static-1/figs:/app/figs:ro
       - ./node-bootstrap.json:/app/node-bootstrap.json:ro
+      - data-static-1:/app/data
     command:
       - "-config=/app/node-bootstrap.json"
       - "-privkey=/app/node-identity.pem"
       - "-services-dir=/app/services"
       - "-addons-dir=/app/addons"
       - "-figs-dir=/app/figs"
+      - "-data-dir=/app/data"
       - "-listen=/ip4/0.0.0.0/tcp/9001"
       - "-no-crypto"
       - "-allow-expired-figs"
@@ -119,12 +121,14 @@ services:
       - ../topology/output/nodes/chat-ledger-1/addons:/app/addons:ro
       - ../topology/output/nodes/chat-ledger-1/figs:/app/figs:ro
       - ./node-bootstrap.json:/app/node-bootstrap.json:ro
+      - data-ledger-1:/app/data
     command:
       - "-config=/app/node-bootstrap.json"
       - "-privkey=/app/node-identity.pem"
       - "-services-dir=/app/services"
       - "-addons-dir=/app/addons"
       - "-figs-dir=/app/figs"
+      - "-data-dir=/app/data"
       - "-listen=/ip4/0.0.0.0/tcp/9003"
       - "-no-crypto"
       - "-allow-expired-figs"
@@ -157,12 +161,14 @@ services:
       - ../topology/output/nodes/chat-ledger-2/addons:/app/addons:ro
       - ../topology/output/nodes/chat-ledger-2/figs:/app/figs:ro
       - ./node-bootstrap.json:/app/node-bootstrap.json:ro
+      - data-ledger-2:/app/data
     command:
       - "-config=/app/node-bootstrap.json"
       - "-privkey=/app/node-identity.pem"
       - "-services-dir=/app/services"
       - "-addons-dir=/app/addons"
       - "-figs-dir=/app/figs"
+      - "-data-dir=/app/data"
       - "-listen=/ip4/0.0.0.0/tcp/9004"
       - "-no-crypto"
       - "-allow-expired-figs"
@@ -195,12 +201,14 @@ services:
       - ../topology/output/nodes/chat-mod-1/addons:/app/addons:ro
       - ../topology/output/nodes/chat-mod-1/figs:/app/figs:ro
       - ./node-bootstrap.json:/app/node-bootstrap.json:ro
+      - data-mod-1:/app/data
     command:
       - "-config=/app/node-bootstrap.json"
       - "-privkey=/app/node-identity.pem"
       - "-services-dir=/app/services"
       - "-addons-dir=/app/addons"
       - "-figs-dir=/app/figs"
+      - "-data-dir=/app/data"
       - "-listen=/ip4/0.0.0.0/tcp/9005"
       - "-no-crypto"
       - "-allow-expired-figs"
@@ -233,12 +241,14 @@ services:
       - ../topology/output/nodes/chat-admin-1/addons:/app/addons:ro
       - ../topology/output/nodes/chat-admin-1/figs:/app/figs:ro
       - ./node-bootstrap.json:/app/node-bootstrap.json:ro
+      - data-admin-1:/app/data
     command:
       - "-config=/app/node-bootstrap.json"
       - "-privkey=/app/node-identity.pem"
       - "-services-dir=/app/services"
       - "-addons-dir=/app/addons"
       - "-figs-dir=/app/figs"
+      - "-data-dir=/app/data"
       - "-listen=/ip4/0.0.0.0/tcp/9006"
       - "-no-crypto"
       - "-allow-expired-figs"
@@ -256,3 +266,13 @@ networks:
   net-ledger-2: { driver: bridge }
   net-mod-1:    { driver: bridge }
   net-admin-1:  { driver: bridge }
+
+# Per-node writable volumes hold the durable persistence tree
+# (/app/data/peerstore.db), so warm-dial state survives `docker compose
+# down/up`. All other node mounts are read-only generated topology.
+volumes:
+  data-static-1: {}
+  data-ledger-1: {}
+  data-ledger-2: {}
+  data-mod-1:    {}
+  data-admin-1:  {}
