@@ -150,7 +150,7 @@ func (h *Handler) handleIncomingStream(s network.Stream) {
 	}
 
 	// Connect to target
-	targetAddr := fmt.Sprintf("%s:%d", targetHost, targetPort)
+	targetAddr := net.JoinHostPort(targetHost, strconv.Itoa(int(targetPort)))
 	conn, err := net.DialTimeout("tcp", targetAddr, 10*time.Second)
 	if err != nil {
 		h.logf("Failed to connect to target %s: %v", targetAddr, err)
@@ -349,7 +349,7 @@ func (h *Handler) handleIncomingServiceStream(s network.Stream) {
 		return
 	}
 
-	targetAddr := fmt.Sprintf("%s:%d", targetHost, targetPort)
+	targetAddr := net.JoinHostPort(targetHost, strconv.Itoa(targetPort))
 	h.logf("Service tunnel routing key=%s to %s", serviceKey, targetAddr)
 
 	if !h.isAllowedTarget(targetHost) {

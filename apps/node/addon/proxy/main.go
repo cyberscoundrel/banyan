@@ -1551,7 +1551,7 @@ func handleSOCKS5(conn net.Conn) {
 }
 
 func handleSOCKS5Direct(conn net.Conn, host string, port uint16) {
-	target, err := net.Dial("tcp", fmt.Sprintf("%s:%d", host, port))
+	target, err := net.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(int(port))))
 	if err != nil {
 		conn.Write([]byte{0x05, 0x04, 0x00, 0x01, 0, 0, 0, 0, 0, 0}) // Host unreachable
 		return
